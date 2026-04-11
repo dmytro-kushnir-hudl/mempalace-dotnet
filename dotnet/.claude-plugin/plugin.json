@@ -10,14 +10,8 @@
   "commands": [],
   "mcpServers": {
     "mempalace": {
-      "command": "dotnet",
-      "args": [
-        "run",
-        "--project",
-        "${CLAUDE_PLUGIN_ROOT}/../src/Mempalace.Cli",
-        "--",
-        "mcp"
-      ]
+      "command": "${CLAUDE_PLUGIN_ROOT}/../src/Mempalace.Cli/bin/Release/net10.0/mempalace-dotnet",
+      "args": ["mcp"]
     }
   },
   "keywords": [
