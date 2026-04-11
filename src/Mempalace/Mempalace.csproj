@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <RootNamespace>Mempalace</RootNamespace>
+        <AssemblyName>Mempalace</AssemblyName>
+        <Version>0.1.0</Version>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="../../../../chroma/clients/dotnet/src/Chroma.Client/Chroma.Client.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+            <_Parameter1>Mempalace.Tests</_Parameter1>
+        </AssemblyAttribute>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="9.10.0" />
+        <PackageReference Include="YamlDotNet" Version="16.3.0" />
+        <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
+    </ItemGroup>
+</Project>

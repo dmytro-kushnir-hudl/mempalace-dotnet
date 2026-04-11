@@ -1,0 +1,26 @@
+{
+  "name": "mempalace-dotnet",
+  "version": "0.1.0",
+  "description": "Give your AI a memory — mine projects and conversations into a searchable palace. 22 MCP tools, auto-save hooks, Chroma + SQLite backends.",
+  "author": {
+    "name": "dmytro-kushnir-hudl"
+  },
+  "license": "MIT",
+  "commands": [],
+  "mcpServers": {
+    "mempalace": {
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "${CLAUDE_PLUGIN_ROOT}/../src/Mempalace.Cli",
+        "--",
+        "mcp"
+      ]
+    }
+  },
+  "keywords": [
+    "memory", "ai", "rag", "mcp", "chromadb", "sqlite", "palace", "search", "dotnet"
+  ],
+  "repository": "https://github.com/milla-jovovich/mempalace"
+}
