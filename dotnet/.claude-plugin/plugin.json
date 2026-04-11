@@ -6,6 +6,7 @@
     "name": "dmytro-kushnir-hudl"
   },
   "license": "MIT",
+  "skills": "./skills/",
   "commands": [],
   "mcpServers": {
     "mempalace": {
