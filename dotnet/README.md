@@ -5,7 +5,7 @@
 ## Features
 
 - **22 MCP tools** — search, add/delete drawers, knowledge graph, diary, AAAK compression, entity detection
-- **Two vector backends** — ChromaDB (default) or SQLite via [sqlite-vec](https://github.com/asg017/sqlite-vec)
+- **Two vector backends** — ChromaDB (in-process Rust FFI) or SQLite (pure managed, no native deps)
 - **Auto-save hooks** — Claude Code / Codex lifecycle hooks (stop, precompact) with 15-message auto-save
 - **Conversation mining** — ingests Claude Code JSONL, Codex JSONL, Claude.ai JSON, ChatGPT JSON, Slack JSON, plain text
 - **Local ONNX embeddings** — `all-MiniLM-L6-v2` via Microsoft.ML.OnnxRuntime, no API key required
@@ -31,9 +31,11 @@ dotnet build src/Mempalace.Cli -c Release
 ./src/Mempalace.Cli/bin/Release/net10.0/mempalace-dotnet mcp
 ```
 
-## SQLite backend
+## Backends
 
-Pass `--backend Sqlite` to any command to use the SQLite backend instead of ChromaDB:
+### SQLite (recommended for most users)
+
+Zero native dependencies — pure managed code with brute-force cosine similarity over L2-normalised embeddings. Fast for palaces up to ~10k drawers.
 
 ```bash
 mempalace-dotnet mine ~/project --backend Sqlite
@@ -41,13 +43,22 @@ mempalace-dotnet search "auth bug" --backend Sqlite
 mempalace-dotnet mcp --backend Sqlite
 ```
 
-The SQLite backend uses [sqlite-vec](https://github.com/asg017/sqlite-vec) for approximate nearest-neighbour search when the `vec0` extension is loadable, and falls back to brute-force cosine similarity otherwise. Set `SQLITE_VEC_PATH` to the `.dylib`/`.so` path if you want to use ANN.
+**Benchmark (2026-04-11, M-series Mac, ShortRunJob):**
 
-## ChromaDB backend (FFI)
+| Operation   | Mean   | Allocated |
+|-------------|--------|-----------|
+| Count       | ~1 ms  | 17 KB     |
+| GetFiltered | ~1 ms  | 69–217 KB |
+| Search      | ~13 ms | 437 KB    |
+| Upsert      | ~13 ms | 395 KB    |
 
-The ChromaDB backend uses a custom Rust C FFI client. The native bindings (`libchromadb_dotnet.dylib` / `.so`) are bundled with the Chroma.Client project.
+Search and upsert cost is dominated by the ONNX embedding step (~12 ms); storage is O(1) at these scales.
 
-The client is sourced from a fork of [chroma-core/chroma](https://github.com/chroma-core/chroma):
+### ChromaDB (in-process Rust FFI)
+
+Uses a custom Rust C FFI client bundled as a native dylib/so. ~2–7× slower than SQLite for non-embedding operations; useful when you want Chroma's query semantics or already have an existing Chroma palace.
+
+The native bindings are sourced from a fork of [chroma-core/chroma](https://github.com/chroma-core/chroma):
 
 > **Fork:** [github.com/dmytro-kushnir-hudl/chroma](https://github.com/dmytro-kushnir-hudl/chroma)
 >
@@ -111,15 +122,15 @@ The plugin wires up:
 ## Commands
 
 ```
-mempalace-dotnet mine <dir>       Mine files (--mode convos for chats, --backend Sqlite)
-mempalace-dotnet search <query>   Semantic search (--wing --room --n)
-mempalace-dotnet status           Palace overview
-mempalace-dotnet wake-up          Print L0 identity + L1 essential story
-mempalace-dotnet init <dir>       Auto-detect rooms, write mempalace.yaml
-mempalace-dotnet split <dir>      Split mega transcript files into per-session files
-mempalace-dotnet hook <name>      Run lifecycle hook (session-start | stop | precompact)
-mempalace-dotnet instructions <cmd>  Print usage instructions
-mempalace-dotnet mcp              Start stdio MCP server
+mempalace-dotnet mine <dir>            Mine files (--mode convos for chats, --backend Sqlite)
+mempalace-dotnet search <query>        Semantic search (--wing --room --n)
+mempalace-dotnet status                Palace overview
+mempalace-dotnet wake-up               Print L0 identity + L1 essential story
+mempalace-dotnet init <dir>            Auto-detect rooms, write mempalace.yaml
+mempalace-dotnet split <dir>           Split mega transcript files into per-session files
+mempalace-dotnet hook <name>           Run lifecycle hook (session-start | stop | precompact)
+mempalace-dotnet instructions <cmd>    Print usage instructions
+mempalace-dotnet mcp                   Start stdio MCP server
 ```
 
 ## Architecture
@@ -129,32 +140,50 @@ src/Mempalace/
   Storage/
     IVectorCollection.cs        Backend-agnostic interface
     MetadataFilter.cs           Equality + AND filter DSL
-    ChromaVectorCollection.cs   ChromaDB adapter (Rust FFI)
-    SqliteVectorCollection.cs   SQLite adapter (sqlite-vec + cosine fallback)
-  Palace.cs          PalaceSession — opens IVectorCollection by VectorBackend enum
-  Miner.cs           Project file mining (.gitignore-aware)
-  ConvoMiner.cs      Conversation ingestion (6 chat export formats)
-  Searcher.cs        Semantic search
-  Layers.cs          4-layer memory stack (identity / story / recall / deep search)
-  McpTools.cs        22 MCP tool implementations
-  McpServer.cs       stdio JSON-RPC 2.0 server
-  KnowledgeGraph.cs  SQLite-backed temporal entity graph
-  EntityRegistry.cs  Persistent entity registry + Wikipedia research
-  EntityDetector.cs  Heuristic people/project detector
-  RoomDetector.cs    Auto-detect rooms from folder structure
-  HooksCli.cs        Lifecycle hook runner
-  SplitMegaFiles.cs  Transcript session splitter
-  Dialect.cs         AAAK lossy compression format
+    ChromaVectorCollection.cs   ChromaDB adapter (Rust FFI, cosine similarity from L2 dist)
+    SqliteVectorCollection.cs   SQLite adapter (brute-force cosine, managed-only)
+  Palace.cs            PalaceSession — opens IVectorCollection by VectorBackend enum
+  Miner.cs             Project file mining (.gitignore-aware)
+  ConvoMiner.cs        Conversation ingestion (6 chat export formats)
+  Searcher.cs          Semantic search
+  Layers.cs            4-layer memory stack (identity / story / recall / deep search)
+  McpTools.cs          22 MCP tool implementations (all responses camelCase JSON)
+  McpServer.cs         stdio JSON-RPC 2.0 server (TextReader/TextWriter injectable for tests)
+  KnowledgeGraph.cs    SQLite-backed temporal entity graph
+  EntityRegistry.cs    Persistent entity registry + Wikipedia research
+  EntityDetector.cs    Heuristic people/project detector (CamelCase-aware)
+  RoomDetector.cs      Auto-detect rooms from folder structure
+  HooksCli.cs          Lifecycle hook runner
+  SplitMegaFiles.cs    Transcript session splitter
+  Dialect.cs           AAAK lossy compression format
   GeneralExtractor.cs  Extract typed memories (decision/milestone/problem/preference)
 ```
 
 ## Tests
 
 ```bash
-dotnet test        # 193 unit tests
-./scripts/acceptance_test.sh --sqlite-only   # end-to-end acceptance
-./scripts/acceptance_test.sh --chroma-only   # requires ChromaDB native lib
+# Unit tests (193)
+dotnet test tests/Mempalace.Tests/
+
+# Integration tests — 122 tests covering all 22 MCP tools, both backends
+dotnet test tests/Mempalace.IntegrationTests/
+
+# Filter by group
+dotnet test tests/Mempalace.IntegrationTests/ --filter "FullyQualifiedName~T31_T38"
+
+# All tests
+dotnet test
 ```
+
+The integration tests drive `McpServer.RunAsync` in-process via `StringReader`/`StringWriter` — no subprocess, no ports. The full suite (315 tests) runs in ~25 s.
+
+## Benchmarks
+
+```bash
+dotnet run -c Release --project benchmarks/Mempalace.Benchmarks/
+```
+
+Compares Sqlite vs Chroma for `Upsert`, `Search`, `GetFiltered`, and `Count` at 50 and 200 drawer counts. Uses `[ShortRunJob]` (1 warmup, 3 iterations). See `docs/benchmark-results-2026-04-11.md` for full results.
 
 ## License
 
