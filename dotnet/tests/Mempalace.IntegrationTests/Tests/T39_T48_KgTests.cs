@@ -21,6 +21,9 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     public void Dispose() => _factory.Dispose();
 
+    // Stats keys: PascalCase (Entities, Triples, CurrentFacts, RelationshipTypes)
+    // Triple fields: PascalCase (Subject, Predicate, Object) with lowercase values
+
     [Theory]
     [InlineData(VectorBackend.Sqlite)]
     [InlineData(VectorBackend.Chroma)]
@@ -31,10 +34,10 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
             McpHarness.Call(2, "mempalace_kg_stats", new { }));
 
         var r = s.Result(2);
-        Assert.True(r["entities"]!.GetValue<int>() >= 5);
-        Assert.True(r["triples"]!.GetValue<int>() >= 5);
-        Assert.True(r["current_facts"]!.GetValue<int>() < r["triples"]!.GetValue<int>());
-        var types = r["relationship_types"]!.AsArray()
+        Assert.True(r["Entities"]!.GetValue<int>() >= 5);
+        Assert.True(r["Triples"]!.GetValue<int>() >= 5);
+        Assert.True(r["CurrentFacts"]!.GetValue<int>() < r["Triples"]!.GetValue<int>());
+        var types = r["RelationshipTypes"]!.AsArray()
             .Select(x => x!.GetValue<string>()).ToHashSet();
         Assert.Contains("owns",       types);
         Assert.Contains("depends_on", types);
@@ -53,8 +56,8 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
 
         var triples = s.Result(2)["triples"]!.AsArray();
         Assert.Contains(triples, t =>
-            t!["predicate"]!.GetValue<string>() == "owns" &&
-            t!["object"]!.GetValue<string>()    == "auth-service");
+            t!["Predicate"]!.GetValue<string>() == "owns" &&
+            t!["Object"]!.GetValue<string>()    == "auth-service");
     }
 
     [Theory]
@@ -69,8 +72,8 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
 
         var triples = s.Result(2)["triples"]!.AsArray();
         Assert.Contains(triples, t =>
-            t!["subject"]!.GetValue<string>()   == "Riley" &&
-            t!["predicate"]!.GetValue<string>() == "owns");
+            t!["Subject"]!.GetValue<string>()   == "riley" &&
+            t!["Predicate"]!.GetValue<string>() == "owns");
     }
 
     [Theory]
@@ -84,8 +87,8 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
                 new { entity = "auth-service", direction = "both" }));
 
         var triples = s.Result(2)["triples"]!.AsArray();
-        bool hasOutgoing = triples.Any(t => t!["subject"]!.GetValue<string>() == "auth-service");
-        bool hasIncoming = triples.Any(t => t!["object"]!.GetValue<string>()  == "auth-service");
+        bool hasOutgoing = triples.Any(t => t!["Subject"]!.GetValue<string>() == "auth-service");
+        bool hasIncoming = triples.Any(t => t!["Object"]!.GetValue<string>()  == "auth-service");
         Assert.True(hasOutgoing && hasIncoming);
     }
 
@@ -101,8 +104,8 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
 
         var triples = s.Result(2)["triples"]!.AsArray();
         Assert.Contains(triples, t =>
-            t!["predicate"]!.GetValue<string>() == "uses" &&
-            t!["object"]!.GetValue<string>()    == "mysql");
+            t!["Predicate"]!.GetValue<string>() == "uses" &&
+            t!["Object"]!.GetValue<string>()    == "mysql");
     }
 
     [Theory]
@@ -117,11 +120,11 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
 
         var triples = s.Result(2)["triples"]!.AsArray();
         Assert.DoesNotContain(triples, t =>
-            t!["predicate"]!.GetValue<string>() == "uses" &&
-            t!["object"]!.GetValue<string>()    == "mysql");
+            t!["Predicate"]!.GetValue<string>() == "uses" &&
+            t!["Object"]!.GetValue<string>()    == "mysql");
         Assert.Contains(triples, t =>
-            t!["predicate"]!.GetValue<string>() == "uses" &&
-            t!["object"]!.GetValue<string>()    == "jwt");
+            t!["Predicate"]!.GetValue<string>() == "uses" &&
+            t!["Object"]!.GetValue<string>()    == "jwt");
     }
 
     [Theory]
@@ -139,8 +142,8 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
         Assert.True(s.Result(2)["success"]!.GetValue<bool>());
         var triples = s.Result(3)["triples"]!.AsArray();
         Assert.DoesNotContain(triples, t =>
-            t!["predicate"]!.GetValue<string>() == "owns" &&
-            t!["object"]!.GetValue<string>()    == "auth-service");
+            t!["Predicate"]!.GetValue<string>() == "owns" &&
+            t!["Object"]!.GetValue<string>()    == "auth-service");
     }
 
     [Theory]
@@ -168,9 +171,9 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
         Assert.NotEmpty(timeline);
         foreach (var t in timeline)
         {
-            var subj = t!["subject"]!.GetValue<string>();
-            var obj  = t!["object"]!.GetValue<string>();
-            Assert.True(subj == "Sam" || obj == "Sam");
+            var subj = t!["Subject"]!.GetValue<string>();
+            var obj  = t!["Object"]!.GetValue<string>();
+            Assert.True(subj == "sam" || obj == "sam");
         }
     }
 
@@ -182,7 +185,7 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
         var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
         var before = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_kg_stats", new { }));
-        var countBefore = before.Result(2)["triples"]!.GetValue<int>();
+        var countBefore = before.Result(2)["Triples"]!.GetValue<int>();
 
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_kg_add",
@@ -190,6 +193,6 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
             McpHarness.Call(3, "mempalace_kg_stats", new { }));
 
         Assert.True(s.Result(2)["success"]!.GetValue<bool>());
-        Assert.Equal(countBefore, s.Result(3)["triples"]!.GetValue<int>());
+        Assert.Equal(countBefore, s.Result(3)["Triples"]!.GetValue<int>());
     }
 }

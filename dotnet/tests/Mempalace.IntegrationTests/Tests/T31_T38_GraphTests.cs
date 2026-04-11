@@ -110,11 +110,11 @@ public sealed class T31_T38_GraphTests(EmbedderFixture embedder) : IAsyncLifetim
             McpHarness.Call(2, "mempalace_traverse_graph",
                 new { start_room = "auth", max_hops = 1 }));
 
-        var nodes = s.Result(2)["nodes"]!.AsArray();
+        var nodes = s.Result(2).AsArray();
         Assert.NotEmpty(nodes);
         var first = nodes[0]!;
-        Assert.Equal("auth", first["Room"]!.GetValue<string>());
-        Assert.Equal(0, first["Hop"]!.GetValue<int>());
+        Assert.Equal("auth", first["room"]!.GetValue<string>());
+        Assert.Equal(0, first["hop"]!.GetValue<int>());
         Assert.True(nodes.Count > 1, "Expected hop-1 nodes");
     }
 
@@ -145,6 +145,6 @@ public sealed class T31_T38_GraphTests(EmbedderFixture embedder) : IAsyncLifetim
             McpHarness.Call(2, "mempalace_traverse_graph",
                 new { start_room = "auth", max_hops = 0 }));
 
-        Assert.Single(s.Result(2)["nodes"]!.AsArray());
+        Assert.Single(s.Result(2).AsArray());
     }
 }
