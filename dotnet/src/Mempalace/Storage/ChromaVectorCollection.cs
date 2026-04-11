@@ -63,11 +63,14 @@ public sealed class ChromaVectorCollection : IVectorCollection
         for (int i = 0; i < ids.Length; i++)
         {
             var dist = i < dists.Length ? dists[i] ?? 0.0 : 0.0;
+            // Chroma returns L2 distance. For L2-normalized unit vectors:
+            // cosine_similarity = 1 - (L2² / 2), mapped to [0, 1] via clamp.
+            var similarity = Math.Max(0.0, Math.Min(1.0, 1.0 - (dist * dist / 2.0)));
             results[i] = new VectorSearchResult(
                 Id:         ids[i],
                 Document:   i < docs.Length  ? docs[i]  : null,
                 Metadata:   i < metas.Length ? metas[i] : null,
-                Similarity: Math.Round(1.0 - dist, 6));
+                Similarity: Math.Round(similarity, 6));
         }
         return results;
     }
