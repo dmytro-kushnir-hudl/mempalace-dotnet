@@ -25,32 +25,42 @@ public static class McpServer
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
-public static async Task RunAsync(McpToolContext ctx, CancellationToken ct = default)
+public static async Task RunAsync(McpToolContext ctx,
+        System.IO.TextReader? reader = null,
+        System.IO.TextWriter? writer = null,
+        CancellationToken ct = default)
     {
-        // Suppress all stderr noise so MCP transport stays clean
+        bool ownReader = reader is null, ownWriter = writer is null;
+        reader ??= new System.IO.StreamReader(Console.OpenStandardInput(), System.Text.Encoding.UTF8);
+        writer ??= new System.IO.StreamWriter(Console.OpenStandardOutput(), System.Text.Encoding.UTF8) { AutoFlush = true };
+
         Console.Error.WriteLine("[mempalace] MCP server started");
 
-        var stdin  = Console.OpenStandardInput();
-        var stdout = Console.OpenStandardOutput();
-        using var reader = new System.IO.StreamReader(stdin, System.Text.Encoding.UTF8);
-        using var writer = new System.IO.StreamWriter(stdout, System.Text.Encoding.UTF8) { AutoFlush = true };
-
-        while (!ct.IsCancellationRequested)
+        try
         {
-            string? line;
-            try { line = await reader.ReadLineAsync(ct); }
-            catch (OperationCanceledException) { break; }
+            while (!ct.IsCancellationRequested)
+            {
+                string? line;
+                try { line = await reader.ReadLineAsync(ct); }
+                catch (OperationCanceledException) { break; }
 
-            if (line is null) break;
-            if (string.IsNullOrWhiteSpace(line)) continue;
+                if (line is null) break;
+                line = line.TrimStart('\uFEFF');
+                if (string.IsNullOrWhiteSpace(line)) continue;
 
-            JsonNode? request;
-            try { request = JsonNode.Parse(line); }
-            catch { await WriteError(writer, null, -32700, "Parse error"); continue; }
+                JsonNode? request;
+                try { request = JsonNode.Parse(line); }
+                catch { await WriteError(writer, null, -32700, "Parse error"); continue; }
 
-            var response = await HandleAsync(ctx, request!, ct);
-            if (response is not null)
-                await writer.WriteLineAsync(response.ToJsonString(RelaxedJsonOpts));
+                var response = await HandleAsync(ctx, request!, ct);
+                if (response is not null)
+                    await writer.WriteLineAsync(response.ToJsonString(RelaxedJsonOpts));
+            }
+        }
+        finally
+        {
+            if (ownReader) reader.Dispose();
+            if (ownWriter) { await writer.FlushAsync(); writer.Dispose(); }
         }
     }
 
@@ -234,6 +244,6 @@ public static async Task RunAsync(McpToolContext ctx, CancellationToken ct = def
         ["error"]   = new JsonObject { ["code"] = code, ["message"] = message },
     };
 
-    private static async Task WriteError(System.IO.StreamWriter w, JsonNode? id, int code, string msg)
+    private static async Task WriteError(System.IO.TextWriter w, JsonNode? id, int code, string msg)
         => await w.WriteLineAsync(Error(id, code, msg).ToJsonString(RelaxedJsonOpts));
 }

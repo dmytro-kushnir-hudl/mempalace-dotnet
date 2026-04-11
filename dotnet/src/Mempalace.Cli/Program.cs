@@ -170,7 +170,7 @@ mcpCmd.SetHandler(async (palace, backend) =>
 
     using var cts = new CancellationTokenSource();
     Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
-    await McpServer.RunAsync(ctx, cts.Token);
+    await McpServer.RunAsync(ctx, ct: cts.Token);
 }, palaceOpt, backendOpt);
 
 rootCmd.AddCommand(mcpCmd);

@@ -5,6 +5,7 @@
     </Folder>
     <Folder Name="/tests/">
         <Project Path="tests/Mempalace.Tests/Mempalace.Tests.csproj"/>
+        <Project Path="tests/Mempalace.IntegrationTests/Mempalace.IntegrationTests.csproj"/>
     </Folder>
     <Folder Name="/benchmarks/">
         <Project Path="benchmarks/Mempalace.Benchmarks/Mempalace.Benchmarks.csproj"/>

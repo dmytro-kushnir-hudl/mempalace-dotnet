@@ -1,0 +1,1032 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "Mempalace.IntegrationTests/1.0.0": {
+        "dependencies": {
+          "Mempalace": "0.1.0",
+          "Microsoft.NET.Test.Sdk": "17.12.0",
+          "xunit.v3": "1.0.0"
+        },
+        "runtime": {
+          "Mempalace.IntegrationTests.dll": {}
+        }
+      },
+      "Google.Protobuf/3.27.1": {
+        "runtime": {
+          "lib/net5.0/Google.Protobuf.dll": {
+            "assemblyVersion": "3.27.1.0",
+            "fileVersion": "3.27.1.0"
+          }
+        }
+      },
+      "Microsoft.Bcl.AsyncInterfaces/6.0.0": {
+        "runtime": {
+          "lib/netstandard2.1/Microsoft.Bcl.AsyncInterfaces.dll": {
+            "assemblyVersion": "6.0.0.0",
+            "fileVersion": "6.0.21.52210"
+          }
+        }
+      },
+      "Microsoft.CodeCoverage/17.12.0": {
+        "runtime": {
+          "lib/netcoreapp3.1/Microsoft.VisualStudio.CodeCoverage.Shim.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "17.1200.524.48002"
+          }
+        }
+      },
+      "Microsoft.Data.Sqlite/8.0.0": {
+        "dependencies": {
+          "Microsoft.Data.Sqlite.Core": "8.0.0",
+          "SQLitePCLRaw.bundle_e_sqlite3": "2.1.6"
+        }
+      },
+      "Microsoft.Data.Sqlite.Core/8.0.0": {
+        "dependencies": {
+          "SQLitePCLRaw.core": "2.1.6"
+        },
+        "runtime": {
+          "lib/net8.0/Microsoft.Data.Sqlite.dll": {
+            "assemblyVersion": "8.0.0.0",
+            "fileVersion": "8.0.23.53103"
+          }
+        }
+      },
+      "Microsoft.Extensions.AI.Abstractions/9.10.0": {
+        "runtime": {
+          "lib/net9.0/Microsoft.Extensions.AI.Abstractions.dll": {
+            "assemblyVersion": "9.10.0.0",
+            "fileVersion": "9.1000.25.51303"
+          }
+        }
+      },
+      "Microsoft.ML.OnnxRuntime/1.20.1": {
+        "dependencies": {
+          "Microsoft.ML.OnnxRuntime.Managed": "1.20.1"
+        },
+        "runtimeTargets": {
+          "runtimes/android/native/onnxruntime.aar": {
+            "rid": "android",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/ios/native/onnxruntime.xcframework.zip": {
+            "rid": "ios",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-arm64/native/libonnxruntime.so": {
+            "rid": "linux-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-arm64/native/libonnxruntime_providers_shared.so": {
+            "rid": "linux-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-x64/native/libonnxruntime.so": {
+            "rid": "linux-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-x64/native/libonnxruntime_providers_shared.so": {
+            "rid": "linux-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/osx-arm64/native/libonnxruntime.dylib": {
+            "rid": "osx-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/osx-x64/native/libonnxruntime.dylib": {
+            "rid": "osx-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-arm64/native/onnxruntime.dll": {
+            "rid": "win-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-arm64/native/onnxruntime.lib": {
+            "rid": "win-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-arm64/native/onnxruntime_providers_shared.dll": {
+            "rid": "win-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-arm64/native/onnxruntime_providers_shared.lib": {
+            "rid": "win-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-x64/native/onnxruntime.dll": {
+            "rid": "win-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-x64/native/onnxruntime.lib": {
+            "rid": "win-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-x64/native/onnxruntime_providers_shared.dll": {
+            "rid": "win-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-x64/native/onnxruntime_providers_shared.lib": {
+            "rid": "win-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-x86/native/onnxruntime.dll": {
+            "rid": "win-x86",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-x86/native/onnxruntime.lib": {
+            "rid": "win-x86",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-x86/native/onnxruntime_providers_shared.dll": {
+            "rid": "win-x86",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-x86/native/onnxruntime_providers_shared.lib": {
+            "rid": "win-x86",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          }
+        }
+      },
+      "Microsoft.ML.OnnxRuntime.Managed/1.20.1": {
+        "runtime": {
+          "lib/net8.0/Microsoft.ML.OnnxRuntime.dll": {
+            "assemblyVersion": "1.20.1.0",
+            "fileVersion": "1.20.1.0"
+          }
+        }
+      },
+      "Microsoft.ML.Tokenizers/0.22.0": {
+        "dependencies": {
+          "Google.Protobuf": "3.27.1"
+        },
+        "runtime": {
+          "lib/net8.0/Microsoft.ML.Tokenizers.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "0.2200.24.56302"
+          }
+        }
+      },
+      "Microsoft.NET.Test.Sdk/17.12.0": {
+        "dependencies": {
+          "Microsoft.CodeCoverage": "17.12.0",
+          "Microsoft.TestPlatform.TestHost": "17.12.0"
+        }
+      },
+      "Microsoft.Testing.Extensions.TrxReport.Abstractions/1.4.3": {
+        "dependencies": {
+          "Microsoft.Testing.Platform": "1.4.3"
+        },
+        "runtime": {
+          "lib/net8.0/Microsoft.Testing.Extensions.TrxReport.Abstractions.dll": {
+            "assemblyVersion": "1.4.3.0",
+            "fileVersion": "1.400.324.56104"
+          }
+        }
+      },
+      "Microsoft.Testing.Platform/1.4.3": {
+        "runtime": {
+          "lib/net8.0/Microsoft.Testing.Platform.dll": {
+            "assemblyVersion": "1.4.3.0",
+            "fileVersion": "1.400.324.56104"
+          }
+        },
+        "resources": {
+          "lib/net8.0/cs/Microsoft.Testing.Platform.resources.dll": {
+            "locale": "cs"
+          },
+          "lib/net8.0/de/Microsoft.Testing.Platform.resources.dll": {
+            "locale": "de"
+          },
+          "lib/net8.0/es/Microsoft.Testing.Platform.resources.dll": {
+            "locale": "es"
+          },
+          "lib/net8.0/fr/Microsoft.Testing.Platform.resources.dll": {
+            "locale": "fr"
+          },
+          "lib/net8.0/it/Microsoft.Testing.Platform.resources.dll": {
+            "locale": "it"
+          },
+          "lib/net8.0/ja/Microsoft.Testing.Platform.resources.dll": {
+            "locale": "ja"
+          },
+          "lib/net8.0/ko/Microsoft.Testing.Platform.resources.dll": {
+            "locale": "ko"
+          },
+          "lib/net8.0/pl/Microsoft.Testing.Platform.resources.dll": {
+            "locale": "pl"
+          },
+          "lib/net8.0/pt-BR/Microsoft.Testing.Platform.resources.dll": {
+            "locale": "pt-BR"
+          },
+          "lib/net8.0/ru/Microsoft.Testing.Platform.resources.dll": {
+            "locale": "ru"
+          },
+          "lib/net8.0/tr/Microsoft.Testing.Platform.resources.dll": {
+            "locale": "tr"
+          },
+          "lib/net8.0/zh-Hans/Microsoft.Testing.Platform.resources.dll": {
+            "locale": "zh-Hans"
+          },
+          "lib/net8.0/zh-Hant/Microsoft.Testing.Platform.resources.dll": {
+            "locale": "zh-Hant"
+          }
+        }
+      },
+      "Microsoft.Testing.Platform.MSBuild/1.4.3": {
+        "dependencies": {
+          "Microsoft.Testing.Platform": "1.4.3"
+        },
+        "runtime": {
+          "lib/net8.0/Microsoft.Testing.Platform.MSBuild.dll": {
+            "assemblyVersion": "1.4.3.0",
+            "fileVersion": "1.400.324.56104"
+          }
+        },
+        "resources": {
+          "lib/net8.0/cs/Microsoft.Testing.Platform.MSBuild.resources.dll": {
+            "locale": "cs"
+          },
+          "lib/net8.0/de/Microsoft.Testing.Platform.MSBuild.resources.dll": {
+            "locale": "de"
+          },
+          "lib/net8.0/es/Microsoft.Testing.Platform.MSBuild.resources.dll": {
+            "locale": "es"
+          },
+          "lib/net8.0/fr/Microsoft.Testing.Platform.MSBuild.resources.dll": {
+            "locale": "fr"
+          },
+          "lib/net8.0/it/Microsoft.Testing.Platform.MSBuild.resources.dll": {
+            "locale": "it"
+          },
+          "lib/net8.0/ja/Microsoft.Testing.Platform.MSBuild.resources.dll": {
+            "locale": "ja"
+          },
+          "lib/net8.0/ko/Microsoft.Testing.Platform.MSBuild.resources.dll": {
+            "locale": "ko"
+          },
+          "lib/net8.0/pl/Microsoft.Testing.Platform.MSBuild.resources.dll": {
+            "locale": "pl"
+          },
+          "lib/net8.0/pt-BR/Microsoft.Testing.Platform.MSBuild.resources.dll": {
+            "locale": "pt-BR"
+          },
+          "lib/net8.0/ru/Microsoft.Testing.Platform.MSBuild.resources.dll": {
+            "locale": "ru"
+          },
+          "lib/net8.0/tr/Microsoft.Testing.Platform.MSBuild.resources.dll": {
+            "locale": "tr"
+          },
+          "lib/net8.0/zh-Hans/Microsoft.Testing.Platform.MSBuild.resources.dll": {
+            "locale": "zh-Hans"
+          },
+          "lib/net8.0/zh-Hant/Microsoft.Testing.Platform.MSBuild.resources.dll": {
+            "locale": "zh-Hant"
+          }
+        }
+      },
+      "Microsoft.TestPlatform.ObjectModel/17.12.0": {
+        "runtime": {
+          "lib/netcoreapp3.1/Microsoft.TestPlatform.CoreUtilities.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "17.1200.24.56501"
+          },
+          "lib/netcoreapp3.1/Microsoft.TestPlatform.PlatformAbstractions.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "17.1200.24.56501"
+          },
+          "lib/netcoreapp3.1/Microsoft.VisualStudio.TestPlatform.ObjectModel.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "17.1200.24.56501"
+          }
+        },
+        "resources": {
+          "lib/netcoreapp3.1/cs/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "cs"
+          },
+          "lib/netcoreapp3.1/cs/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "cs"
+          },
+          "lib/netcoreapp3.1/de/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "de"
+          },
+          "lib/netcoreapp3.1/de/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "de"
+          },
+          "lib/netcoreapp3.1/es/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "es"
+          },
+          "lib/netcoreapp3.1/es/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "es"
+          },
+          "lib/netcoreapp3.1/fr/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "fr"
+          },
+          "lib/netcoreapp3.1/fr/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "fr"
+          },
+          "lib/netcoreapp3.1/it/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "it"
+          },
+          "lib/netcoreapp3.1/it/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "it"
+          },
+          "lib/netcoreapp3.1/ja/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "ja"
+          },
+          "lib/netcoreapp3.1/ja/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "ja"
+          },
+          "lib/netcoreapp3.1/ko/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "ko"
+          },
+          "lib/netcoreapp3.1/ko/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "ko"
+          },
+          "lib/netcoreapp3.1/pl/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "pl"
+          },
+          "lib/netcoreapp3.1/pl/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "pl"
+          },
+          "lib/netcoreapp3.1/pt-BR/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "pt-BR"
+          },
+          "lib/netcoreapp3.1/pt-BR/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "pt-BR"
+          },
+          "lib/netcoreapp3.1/ru/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "ru"
+          },
+          "lib/netcoreapp3.1/ru/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "ru"
+          },
+          "lib/netcoreapp3.1/tr/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "tr"
+          },
+          "lib/netcoreapp3.1/tr/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "tr"
+          },
+          "lib/netcoreapp3.1/zh-Hans/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "zh-Hans"
+          },
+          "lib/netcoreapp3.1/zh-Hans/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "zh-Hans"
+          },
+          "lib/netcoreapp3.1/zh-Hant/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "zh-Hant"
+          },
+          "lib/netcoreapp3.1/zh-Hant/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "zh-Hant"
+          }
+        }
+      },
+      "Microsoft.TestPlatform.TestHost/17.12.0": {
+        "dependencies": {
+          "Microsoft.TestPlatform.ObjectModel": "17.12.0",
+          "Newtonsoft.Json": "13.0.1"
+        },
+        "runtime": {
+          "lib/netcoreapp3.1/Microsoft.TestPlatform.CommunicationUtilities.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "17.1200.24.56501"
+          },
+          "lib/netcoreapp3.1/Microsoft.TestPlatform.CrossPlatEngine.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "17.1200.24.56501"
+          },
+          "lib/netcoreapp3.1/Microsoft.TestPlatform.Utilities.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "17.1200.24.56501"
+          },
+          "lib/netcoreapp3.1/Microsoft.VisualStudio.TestPlatform.Common.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "17.1200.24.56501"
+          },
+          "lib/netcoreapp3.1/testhost.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "17.1200.24.56501"
+          }
+        },
+        "resources": {
+          "lib/netcoreapp3.1/cs/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "cs"
+          },
+          "lib/netcoreapp3.1/cs/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "cs"
+          },
+          "lib/netcoreapp3.1/cs/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "cs"
+          },
+          "lib/netcoreapp3.1/de/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "de"
+          },
+          "lib/netcoreapp3.1/de/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "de"
+          },
+          "lib/netcoreapp3.1/de/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "de"
+          },
+          "lib/netcoreapp3.1/es/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "es"
+          },
+          "lib/netcoreapp3.1/es/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "es"
+          },
+          "lib/netcoreapp3.1/es/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "es"
+          },
+          "lib/netcoreapp3.1/fr/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "fr"
+          },
+          "lib/netcoreapp3.1/fr/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "fr"
+          },
+          "lib/netcoreapp3.1/fr/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "fr"
+          },
+          "lib/netcoreapp3.1/it/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "it"
+          },
+          "lib/netcoreapp3.1/it/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "it"
+          },
+          "lib/netcoreapp3.1/it/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "it"
+          },
+          "lib/netcoreapp3.1/ja/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "ja"
+          },
+          "lib/netcoreapp3.1/ja/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "ja"
+          },
+          "lib/netcoreapp3.1/ja/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "ja"
+          },
+          "lib/netcoreapp3.1/ko/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "ko"
+          },
+          "lib/netcoreapp3.1/ko/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "ko"
+          },
+          "lib/netcoreapp3.1/ko/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "ko"
+          },
+          "lib/netcoreapp3.1/pl/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "pl"
+          },
+          "lib/netcoreapp3.1/pl/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "pl"
+          },
+          "lib/netcoreapp3.1/pl/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "pl"
+          },
+          "lib/netcoreapp3.1/pt-BR/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "pt-BR"
+          },
+          "lib/netcoreapp3.1/pt-BR/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "pt-BR"
+          },
+          "lib/netcoreapp3.1/pt-BR/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "pt-BR"
+          },
+          "lib/netcoreapp3.1/ru/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "ru"
+          },
+          "lib/netcoreapp3.1/ru/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "ru"
+          },
+          "lib/netcoreapp3.1/ru/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "ru"
+          },
+          "lib/netcoreapp3.1/tr/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "tr"
+          },
+          "lib/netcoreapp3.1/tr/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "tr"
+          },
+          "lib/netcoreapp3.1/tr/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "tr"
+          },
+          "lib/netcoreapp3.1/zh-Hans/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "zh-Hans"
+          },
+          "lib/netcoreapp3.1/zh-Hans/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "zh-Hans"
+          },
+          "lib/netcoreapp3.1/zh-Hans/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "zh-Hans"
+          },
+          "lib/netcoreapp3.1/zh-Hant/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "zh-Hant"
+          },
+          "lib/netcoreapp3.1/zh-Hant/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "zh-Hant"
+          },
+          "lib/netcoreapp3.1/zh-Hant/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "zh-Hant"
+          }
+        }
+      },
+      "Newtonsoft.Json/13.0.1": {
+        "runtime": {
+          "lib/netstandard2.0/Newtonsoft.Json.dll": {
+            "assemblyVersion": "13.0.0.0",
+            "fileVersion": "13.0.1.25517"
+          }
+        }
+      },
+      "SQLitePCLRaw.bundle_e_sqlite3/2.1.6": {
+        "dependencies": {
+          "SQLitePCLRaw.lib.e_sqlite3": "2.1.6",
+          "SQLitePCLRaw.provider.e_sqlite3": "2.1.6"
+        },
+        "runtime": {
+          "lib/netstandard2.0/SQLitePCLRaw.batteries_v2.dll": {
+            "assemblyVersion": "2.1.6.2060",
+            "fileVersion": "2.1.6.2060"
+          }
+        }
+      },
+      "SQLitePCLRaw.core/2.1.6": {
+        "runtime": {
+          "lib/netstandard2.0/SQLitePCLRaw.core.dll": {
+            "assemblyVersion": "2.1.6.2060",
+            "fileVersion": "2.1.6.2060"
+          }
+        }
+      },
+      "SQLitePCLRaw.lib.e_sqlite3/2.1.6": {
+        "runtimeTargets": {
+          "runtimes/browser-wasm/nativeassets/net8.0/e_sqlite3.a": {
+            "rid": "browser-wasm",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-arm/native/libe_sqlite3.so": {
+            "rid": "linux-arm",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-arm64/native/libe_sqlite3.so": {
+            "rid": "linux-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-armel/native/libe_sqlite3.so": {
+            "rid": "linux-armel",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-mips64/native/libe_sqlite3.so": {
+            "rid": "linux-mips64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-musl-arm/native/libe_sqlite3.so": {
+            "rid": "linux-musl-arm",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-musl-arm64/native/libe_sqlite3.so": {
+            "rid": "linux-musl-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-musl-x64/native/libe_sqlite3.so": {
+            "rid": "linux-musl-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-ppc64le/native/libe_sqlite3.so": {
+            "rid": "linux-ppc64le",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-s390x/native/libe_sqlite3.so": {
+            "rid": "linux-s390x",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-x64/native/libe_sqlite3.so": {
+            "rid": "linux-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-x86/native/libe_sqlite3.so": {
+            "rid": "linux-x86",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/maccatalyst-arm64/native/libe_sqlite3.dylib": {
+            "rid": "maccatalyst-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/maccatalyst-x64/native/libe_sqlite3.dylib": {
+            "rid": "maccatalyst-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/osx-arm64/native/libe_sqlite3.dylib": {
+            "rid": "osx-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/osx-x64/native/libe_sqlite3.dylib": {
+            "rid": "osx-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-arm/native/e_sqlite3.dll": {
+            "rid": "win-arm",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-arm64/native/e_sqlite3.dll": {
+            "rid": "win-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-x64/native/e_sqlite3.dll": {
+            "rid": "win-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-x86/native/e_sqlite3.dll": {
+            "rid": "win-x86",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          }
+        }
+      },
+      "SQLitePCLRaw.provider.e_sqlite3/2.1.6": {
+        "dependencies": {
+          "SQLitePCLRaw.core": "2.1.6"
+        },
+        "runtime": {
+          "lib/net6.0/SQLitePCLRaw.provider.e_sqlite3.dll": {
+            "assemblyVersion": "2.1.6.2060",
+            "fileVersion": "2.1.6.2060"
+          }
+        }
+      },
+      "System.Numerics.Tensors/9.0.4": {
+        "runtime": {
+          "lib/net9.0/System.Numerics.Tensors.dll": {
+            "assemblyVersion": "9.0.0.4",
+            "fileVersion": "9.0.425.16305"
+          }
+        }
+      },
+      "xunit.v3/1.0.0": {
+        "dependencies": {
+          "xunit.v3.assert": "1.0.0",
+          "xunit.v3.core": "1.0.0"
+        }
+      },
+      "xunit.v3.assert/1.0.0": {
+        "runtime": {
+          "lib/net6.0/xunit.v3.assert.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "xunit.v3.common/1.0.0": {
+        "dependencies": {
+          "Microsoft.Bcl.AsyncInterfaces": "6.0.0"
+        },
+        "runtime": {
+          "lib/netstandard2.0/xunit.v3.common.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "xunit.v3.core/1.0.0": {
+        "dependencies": {
+          "Microsoft.Testing.Platform.MSBuild": "1.4.3",
+          "xunit.v3.extensibility.core": "1.0.0",
+          "xunit.v3.runner.inproc.console": "1.0.0"
+        }
+      },
+      "xunit.v3.extensibility.core/1.0.0": {
+        "dependencies": {
+          "xunit.v3.common": "1.0.0"
+        },
+        "runtime": {
+          "lib/netstandard2.0/xunit.v3.core.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "xunit.v3.runner.common/1.0.0": {
+        "dependencies": {
+          "xunit.v3.common": "1.0.0"
+        },
+        "runtime": {
+          "lib/netstandard2.0/xunit.v3.runner.common.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "xunit.v3.runner.inproc.console/1.0.0": {
+        "dependencies": {
+          "Microsoft.Testing.Extensions.TrxReport.Abstractions": "1.4.3",
+          "Microsoft.Testing.Platform": "1.4.3",
+          "xunit.v3.extensibility.core": "1.0.0",
+          "xunit.v3.runner.common": "1.0.0"
+        },
+        "runtime": {
+          "lib/net6.0/xunit.v3.runner.inproc.console.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "YamlDotNet/16.3.0": {
+        "runtime": {
+          "lib/net8.0/YamlDotNet.dll": {
+            "assemblyVersion": "16.0.0.0",
+            "fileVersion": "16.3.0.0"
+          }
+        }
+      },
+      "Chroma.Client/0.1.0": {
+        "dependencies": {
+          "Microsoft.Extensions.AI.Abstractions": "9.10.0",
+          "Microsoft.ML.OnnxRuntime": "1.20.1",
+          "Microsoft.ML.Tokenizers": "0.22.0",
+          "System.Numerics.Tensors": "9.0.4"
+        },
+        "runtime": {
+          "Chroma.Client.dll": {
+            "assemblyVersion": "0.1.0.0",
+            "fileVersion": "0.1.0.0"
+          }
+        }
+      },
+      "Mempalace/0.1.0": {
+        "dependencies": {
+          "Chroma.Client": "0.1.0",
+          "Microsoft.Data.Sqlite": "8.0.0",
+          "Microsoft.Extensions.AI.Abstractions": "9.10.0",
+          "YamlDotNet": "16.3.0"
+        },
+        "runtime": {
+          "Mempalace.dll": {
+            "assemblyVersion": "0.1.0.0",
+            "fileVersion": "0.1.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Mempalace.IntegrationTests/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Google.Protobuf/3.27.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-7IVz9TzhYCZ8qY0rPhXUnyJSXYdshUqmmxmTI763XmDDSJJFnyfKH43FFcMJu/CZgBcE98xlFztrKwhzcRkiPg==",
+      "path": "google.protobuf/3.27.1",
+      "hashPath": "google.protobuf.3.27.1.nupkg.sha512"
+    },
+    "Microsoft.Bcl.AsyncInterfaces/6.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-UcSjPsst+DfAdJGVDsu346FX0ci0ah+lw3WRtn18NUwEqRt70HaOQ7lI72vy3+1LxtqI3T5GWwV39rQSrCzAeg==",
+      "path": "microsoft.bcl.asyncinterfaces/6.0.0",
+      "hashPath": "microsoft.bcl.asyncinterfaces.6.0.0.nupkg.sha512"
+    },
+    "Microsoft.CodeCoverage/17.12.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-4svMznBd5JM21JIG2xZKGNanAHNXplxf/kQDFfLHXQ3OnpJkayRK/TjacFjA+EYmoyuNXHo/sOETEfcYtAzIrA==",
+      "path": "microsoft.codecoverage/17.12.0",
+      "hashPath": "microsoft.codecoverage.17.12.0.nupkg.sha512"
+    },
+    "Microsoft.Data.Sqlite/8.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-H+iC5IvkCCKSNHXzL3JARvDn7VpkvuJM91KVB89sKjeTF/KX/BocNNh93ZJtX5MCQKb/z4yVKgkU2sVIq+xKfg==",
+      "path": "microsoft.data.sqlite/8.0.0",
+      "hashPath": "microsoft.data.sqlite.8.0.0.nupkg.sha512"
+    },
+    "Microsoft.Data.Sqlite.Core/8.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-pujbzfszX7jAl7oTbHhqx7pxd9jibeyHHl8zy1gd55XMaKWjDtc5XhhNYwQnrwWYCInNdVoArbaaAvLgW7TwuA==",
+      "path": "microsoft.data.sqlite.core/8.0.0",
+      "hashPath": "microsoft.data.sqlite.core.8.0.0.nupkg.sha512"
+    },
+    "Microsoft.Extensions.AI.Abstractions/9.10.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-oBdh3TDNN+F28L2ZKOF1NfobJF3BbKWrpta+HI9dz8OcwIiIkFGvP8n1GNPO92upNQ9gofMX1O+MXtopW6tR1A==",
+      "path": "microsoft.extensions.ai.abstractions/9.10.0",
+      "hashPath": "microsoft.extensions.ai.abstractions.9.10.0.nupkg.sha512"
+    },
+    "Microsoft.ML.OnnxRuntime/1.20.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-NzUD79BC6R7TKROLyB3XCzXTpbNZ1YfOdVbult7hoFvd/xyRecOMiRO5HTzkPXvaFlcvZ91+WNCiroAPzUE7Dw==",
+      "path": "microsoft.ml.onnxruntime/1.20.1",
+      "hashPath": "microsoft.ml.onnxruntime.1.20.1.nupkg.sha512"
+    },
+    "Microsoft.ML.OnnxRuntime.Managed/1.20.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-+EVcEcKdq3gkw6iu8TYl2coJxfPnMi1YQc6eZ80BGNlw6mbBCxNGe6h4udDCwENYWsXFvYjoBc6412t40tl4ew==",
+      "path": "microsoft.ml.onnxruntime.managed/1.20.1",
+      "hashPath": "microsoft.ml.onnxruntime.managed.1.20.1.nupkg.sha512"
+    },
+    "Microsoft.ML.Tokenizers/0.22.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-a7UXmTZwJt9ph2C0SyREWjIwIQ3srJ/uSXVa3pwV7rgO51geQ/ggwTFXML14GWD7ACAKExlA2sQ/Bmxj2a+OoA==",
+      "path": "microsoft.ml.tokenizers/0.22.0",
+      "hashPath": "microsoft.ml.tokenizers.0.22.0.nupkg.sha512"
+    },
+    "Microsoft.NET.Test.Sdk/17.12.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-kt/PKBZ91rFCWxVIJZSgVLk+YR+4KxTuHf799ho8WNiK5ZQpJNAEZCAWX86vcKrs+DiYjiibpYKdGZP6+/N17w==",
+      "path": "microsoft.net.test.sdk/17.12.0",
+      "hashPath": "microsoft.net.test.sdk.17.12.0.nupkg.sha512"
+    },
+    "Microsoft.Testing.Extensions.TrxReport.Abstractions/1.4.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-16sWznD6ZMok/zgW+vrO6zerCFMD9N+ey9bi1iV/e9xxsQb4V4y/aW6cY/Y7E9jA7pc+aZ6ffZby43yxQOoYZA==",
+      "path": "microsoft.testing.extensions.trxreport.abstractions/1.4.3",
+      "hashPath": "microsoft.testing.extensions.trxreport.abstractions.1.4.3.nupkg.sha512"
+    },
+    "Microsoft.Testing.Platform/1.4.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-NedIbwl1T7+ZMeg7gwk0Db8/RFLf0siyVpeTcRMMOle6Xl/ujaYOM4Aduo8rEfVqNj3kcQ7blegpyT3dHi+0PA==",
+      "path": "microsoft.testing.platform/1.4.3",
+      "hashPath": "microsoft.testing.platform.1.4.3.nupkg.sha512"
+    },
+    "Microsoft.Testing.Platform.MSBuild/1.4.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-1gGqgHtiZ6tZn/6Tby+qlKpNe5Ye/5LnxlSsyl4XMZ4m4V+Cu1K1m+gD1zxoxHIvLjgX8mCnQRK95MGBBFuumw==",
+      "path": "microsoft.testing.platform.msbuild/1.4.3",
+      "hashPath": "microsoft.testing.platform.msbuild.1.4.3.nupkg.sha512"
+    },
+    "Microsoft.TestPlatform.ObjectModel/17.12.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-TDqkTKLfQuAaPcEb3pDDWnh7b3SyZF+/W9OZvWFp6eJCIiiYFdSB6taE2I6tWrFw5ywhzOb6sreoGJTI6m3rSQ==",
+      "path": "microsoft.testplatform.objectmodel/17.12.0",
+      "hashPath": "microsoft.testplatform.objectmodel.17.12.0.nupkg.sha512"
+    },
+    "Microsoft.TestPlatform.TestHost/17.12.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-MiPEJQNyADfwZ4pJNpQex+t9/jOClBGMiCiVVFuELCMSX2nmNfvUor3uFVxNNCg30uxDP8JDYfPnMXQzsfzYyg==",
+      "path": "microsoft.testplatform.testhost/17.12.0",
+      "hashPath": "microsoft.testplatform.testhost.17.12.0.nupkg.sha512"
+    },
+    "Newtonsoft.Json/13.0.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-ppPFpBcvxdsfUonNcvITKqLl3bqxWbDCZIzDWHzjpdAHRFfZe0Dw9HmA0+za13IdyrgJwpkDTDA9fHaxOrt20A==",
+      "path": "newtonsoft.json/13.0.1",
+      "hashPath": "newtonsoft.json.13.0.1.nupkg.sha512"
+    },
+    "SQLitePCLRaw.bundle_e_sqlite3/2.1.6": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-BmAf6XWt4TqtowmiWe4/5rRot6GerAeklmOPfviOvwLoF5WwgxcJHAxZtySuyW9r9w+HLILnm8VfJFLCUJYW8A==",
+      "path": "sqlitepclraw.bundle_e_sqlite3/2.1.6",
+      "hashPath": "sqlitepclraw.bundle_e_sqlite3.2.1.6.nupkg.sha512"
+    },
+    "SQLitePCLRaw.core/2.1.6": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-wO6v9GeMx9CUngAet8hbO7xdm+M42p1XeJq47ogyRoYSvNSp0NGLI+MgC0bhrMk9C17MTVFlLiN6ylyExLCc5w==",
+      "path": "sqlitepclraw.core/2.1.6",
+      "hashPath": "sqlitepclraw.core.2.1.6.nupkg.sha512"
+    },
+    "SQLitePCLRaw.lib.e_sqlite3/2.1.6": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-2ObJJLkIUIxRpOUlZNGuD4rICpBnrBR5anjyfUFQep4hMOIeqW+XGQYzrNmHSVz5xSWZ3klSbh7sFR6UyDj68Q==",
+      "path": "sqlitepclraw.lib.e_sqlite3/2.1.6",
+      "hashPath": "sqlitepclraw.lib.e_sqlite3.2.1.6.nupkg.sha512"
+    },
+    "SQLitePCLRaw.provider.e_sqlite3/2.1.6": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-PQ2Oq3yepLY4P7ll145P3xtx2bX8xF4PzaKPRpw9jZlKvfe4LE/saAV82inND9usn1XRpmxXk7Lal3MTI+6CNg==",
+      "path": "sqlitepclraw.provider.e_sqlite3/2.1.6",
+      "hashPath": "sqlitepclraw.provider.e_sqlite3.2.1.6.nupkg.sha512"
+    },
+    "System.Numerics.Tensors/9.0.4": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-ynVvqELpMWGQJ1Y90rlAmuTiSQIkXD0W5AMj7pVpEjECmrcIJLexIBblgccerHFijayfcsl1KCbkk+Sg5cS9vQ==",
+      "path": "system.numerics.tensors/9.0.4",
+      "hashPath": "system.numerics.tensors.9.0.4.nupkg.sha512"
+    },
+    "xunit.v3/1.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-jomUqCyfbILuGa4zWFAU1knj1n5/1H44ACDo7iu6DZlmmSbYlyYgB6Vzy8gxab6eh78otXDF/ntjktDCRkTMIg==",
+      "path": "xunit.v3/1.0.0",
+      "hashPath": "xunit.v3.1.0.0.nupkg.sha512"
+    },
+    "xunit.v3.assert/1.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-XGJP9QfdvT0cF14yPBe8uWQIEJaoaLXKhxWCE3W2mjugUYjiWVCoE1HtPDpoUiKRLcECvTJpmUHngebWTQUMog==",
+      "path": "xunit.v3.assert/1.0.0",
+      "hashPath": "xunit.v3.assert.1.0.0.nupkg.sha512"
+    },
+    "xunit.v3.common/1.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-3w/BtAJe83G73KXpxrejrQw+eO51gmFrHUov5rq2jfb9nFUYWrSvdK55aIPh1SMXZMNka3qnCvkmhFVZ8o7PtA==",
+      "path": "xunit.v3.common/1.0.0",
+      "hashPath": "xunit.v3.common.1.0.0.nupkg.sha512"
+    },
+    "xunit.v3.core/1.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-1OIr5m7smSIHaNPUe8IJ3+UvsQb9KiIQMwUm2uDcLB3w8Z2e1sg0ND4TcVzNltCuWVEnXU73XpNHwrCNLbaQYA==",
+      "path": "xunit.v3.core/1.0.0",
+      "hashPath": "xunit.v3.core.1.0.0.nupkg.sha512"
+    },
+    "xunit.v3.extensibility.core/1.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-TsRSMWPnrZ0uAPBKWCusQi5l406IlwtzIDguID70XrytDmD2H/9yUqoFruMpYfrLPep/vFnv+26L6/6J57TyVQ==",
+      "path": "xunit.v3.extensibility.core/1.0.0",
+      "hashPath": "xunit.v3.extensibility.core.1.0.0.nupkg.sha512"
+    },
+    "xunit.v3.runner.common/1.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-971vQ/IVmxWxKu6Rd9GlCBuoSTn2JH5S6GFUhlaCnMDpx36VjhrwVt2qS2RcMO6Hu4TlNyBEsZqgZ8g6HyMXSQ==",
+      "path": "xunit.v3.runner.common/1.0.0",
+      "hashPath": "xunit.v3.runner.common.1.0.0.nupkg.sha512"
+    },
+    "xunit.v3.runner.inproc.console/1.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-UwtiQZUVpxhulszBKH5Qvuu6Oxs8UXteZEOaOosP9lCXjvBvprxyeHFQCVfMuxKPbITx3MA7h9W7D5vgrR9lzQ==",
+      "path": "xunit.v3.runner.inproc.console/1.0.0",
+      "hashPath": "xunit.v3.runner.inproc.console.1.0.0.nupkg.sha512"
+    },
+    "YamlDotNet/16.3.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-SgMOdxbz8X65z8hraIs6hOEdnkH6hESTAIUa7viEngHOYaH+6q5XJmwr1+yb9vJpNQ19hCQY69xbFsLtXpobQA==",
+      "path": "yamldotnet/16.3.0",
+      "hashPath": "yamldotnet.16.3.0.nupkg.sha512"
+    },
+    "Chroma.Client/0.1.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Mempalace/0.1.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
