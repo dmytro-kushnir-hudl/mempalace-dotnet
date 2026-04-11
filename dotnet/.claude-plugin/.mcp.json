@@ -1,0 +1,12 @@
+{
+  "mempalace": {
+    "command": "dotnet",
+    "args": [
+      "run",
+      "--project",
+      "${CLAUDE_PLUGIN_ROOT}/../src/Mempalace.Cli",
+      "--",
+      "mcp"
+    ]
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "name": "mempalace-dotnet",
+  "version": "0.1.0",
+  "description": "Give your AI a memory — mine projects and conversations into a searchable palace. 22 MCP tools, auto-save hooks, Chroma + SQLite backends.",
+  "author": {
+    "name": "dmytro-kushnir-hudl"
+  },
+  "homepage": "https://github.com/milla-jovovich/mempalace",
+  "repository": "https://github.com/milla-jovovich/mempalace",
+  "license": "MIT",
+  "keywords": [
+    "memory", "ai", "rag", "mcp", "chromadb", "sqlite", "palace", "search", "dotnet"
+  ],
+  "skills": "./skills/",
+  "hooks": "./hooks.json",
+  "mcpServers": {
+    "mempalace": {
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "${CODEX_PLUGIN_ROOT}/../src/Mempalace.Cli",
+        "--",
+        "mcp"
+      ]
+    }
+  },
+  "interface": {
+    "displayName": "MemPalace .NET",
+    "shortDescription": "AI memory system for Codex (.NET port)",
+    "longDescription": "Give your AI a persistent memory — mine projects and conversations into a searchable palace backed by ChromaDB or SQLite, with 22 MCP tools, auto-save hooks, and guided skills.",
+    "developerName": "dmytro-kushnir-hudl",
+    "category": "Coding",
+    "capabilities": ["Interactive", "Read", "Write"],
+    "defaultPrompt": [
+      "Search my memories for recent decisions",
+      "Mine this project into my memory palace",
+      "Show my palace status and room counts"
+    ],
+    "brandColor": "#7C3AED"
+  }
+}

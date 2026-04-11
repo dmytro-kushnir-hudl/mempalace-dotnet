@@ -1,0 +1,8 @@
+{
+  "Stop": {
+    "command": "dotnet run --project \"${CODEX_PLUGIN_ROOT}/../src/Mempalace.Cli\" -- hook stop --harness codex"
+  },
+  "PreCompact": {
+    "command": "dotnet run --project \"${CODEX_PLUGIN_ROOT}/../src/Mempalace.Cli\" -- hook precompact --harness codex"
+  }
+}
