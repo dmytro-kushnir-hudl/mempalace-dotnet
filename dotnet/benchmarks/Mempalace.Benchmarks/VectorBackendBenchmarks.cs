@@ -1,4 +1,5 @@
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Running;
 using Chroma.Embeddings;
 using Mempalace;
@@ -23,6 +24,7 @@ var summary = BenchmarkRunner.Run<VectorBackendBenchmarks>();
 /// Run with:
 ///   dotnet run -c Release --project benchmarks/Mempalace.Benchmarks/
 /// </summary>
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 1, iterationCount: 3, id: "ShortRun")]
 [MemoryDiagnoser]
 [Orderer(BenchmarkDotNet.Order.SummaryOrderPolicy.FastestToSlowest)]
 [RankColumn]
