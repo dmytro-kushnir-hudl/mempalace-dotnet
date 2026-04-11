@@ -147,6 +147,8 @@ public static class McpTools
         McpToolContext ctx, string query, int limit = 5,
         string? wing = null, string? room = null, CancellationToken ct = default)
     {
+        if (limit <= 0)
+            return JsonNode.Parse(JsonSerializer.Serialize(new { Query = query, Wing = wing, Room = room, Results = Array.Empty<object>() }))!;
         try
         {
             var response = await Searcher.SearchMemoriesAsync(
@@ -209,7 +211,7 @@ public static class McpTools
 
     // ── General extractor ─────────────────────────────────────────────────────
 
-    public static JsonNode ExtractMemories(McpToolContext ctx, string text, double minConfidence = 0.3)
+    public static JsonNode ExtractMemories(McpToolContext ctx, string text, double minConfidence = 0.1)
     {
         try
         {

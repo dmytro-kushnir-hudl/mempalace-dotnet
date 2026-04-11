@@ -1,0 +1,12 @@
+<Solution>
+    <Folder Name="/src/">
+        <Project Path="src/Mempalace/Mempalace.csproj"/>
+        <Project Path="src/Mempalace.Cli/Mempalace.Cli.csproj"/>
+    </Folder>
+    <Folder Name="/tests/">
+        <Project Path="tests/Mempalace.Tests/Mempalace.Tests.csproj"/>
+    </Folder>
+    <Folder Name="/benchmarks/">
+        <Project Path="benchmarks/Mempalace.Benchmarks/Mempalace.Benchmarks.csproj"/>
+    </Folder>
+</Solution>

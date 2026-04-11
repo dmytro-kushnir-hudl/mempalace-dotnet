@@ -136,7 +136,9 @@ public static async Task RunAsync(McpToolContext ctx, CancellationToken ct = def
             "mempalace_list_rooms"      => McpTools.ListRooms(ctx, S("wing")),
             "mempalace_get_taxonomy"    => McpTools.GetTaxonomy(ctx),
             "mempalace_get_aaak_spec"   => McpTools.GetAaakSpec(ctx),
-            "mempalace_search"          => await McpTools.SearchAsync(ctx, S("query")!, I("limit", 5), S("wing"), S("room"), ct),
+            "mempalace_search"          => S("query") is { } q
+                                            ? await McpTools.SearchAsync(ctx, q, I("limit", 5), S("wing"), S("room"), ct)
+                                            : new JsonObject { ["error"] = "Missing required argument: query" },
             "mempalace_check_duplicate" => await McpTools.CheckDuplicateAsync(ctx, S("content")!, D("threshold", 0.9), ct),
             "mempalace_traverse_graph"  => McpTools.TraverseGraph(ctx, S("start_room")!, I("max_hops", 2)),
             "mempalace_find_tunnels"    => McpTools.FindTunnels(ctx, S("wing_a"), S("wing_b")),
@@ -150,7 +152,7 @@ public static async Task RunAsync(McpToolContext ctx, CancellationToken ct = def
             "mempalace_kg_stats"        => McpTools.KgStats(ctx),
             "mempalace_diary_write"      => await McpTools.DiaryWriteAsync(ctx, S("agent_name")!, S("entry")!, S("topic") ?? "general", ct),
             "mempalace_diary_read"       => McpTools.DiaryRead(ctx, S("agent_name")!, I("last_n", 10)),
-            "mempalace_extract_memories" => McpTools.ExtractMemories(ctx, S("text")!, D("min_confidence", 0.3)),
+            "mempalace_extract_memories" => McpTools.ExtractMemories(ctx, S("text")!, D("min_confidence", 0.1)),
             "mempalace_detect_entities"  => McpTools.DetectEntities(ctx, S("text")!),
             "mempalace_compress"         => McpTools.Compress(ctx, S("text")!),
             _                            => new JsonObject { ["error"] = $"Unknown tool: {name}" },

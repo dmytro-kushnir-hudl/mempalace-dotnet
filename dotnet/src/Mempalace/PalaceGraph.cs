@@ -301,12 +301,34 @@ public static class PalaceGraph
     {
         var q = query.ToLowerInvariant();
         return rooms
-            .Select(r => (Room: r, Score: r.Contains(q) ? 1.0
-                : q.Split('-').Any(w => r.Contains(w)) ? 0.5 : 0.0))
+            .Select(r =>
+            {
+                var rl = r.ToLowerInvariant();
+                double score = rl.Contains(q) ? 1.0
+                    : q.Contains(rl) ? 0.9
+                    : q.Split('-').Any(w => w.Length >= 3 && rl.Contains(w)) ? 0.5
+                    : EditDistance(q, rl) <= 2 ? 0.3
+                    : 0.0;
+                return (Room: r, Score: score);
+            })
             .Where(x => x.Score > 0)
             .OrderByDescending(x => x.Score)
             .Take(5)
             .Select(x => x.Room)
             .ToList();
+    }
+
+    private static int EditDistance(string a, string b)
+    {
+        int m = a.Length, n = b.Length;
+        var dp = new int[m + 1, n + 1];
+        for (int i = 0; i <= m; i++) dp[i, 0] = i;
+        for (int j = 0; j <= n; j++) dp[0, j] = j;
+        for (int i = 1; i <= m; i++)
+            for (int j = 1; j <= n; j++)
+                dp[i, j] = a[i - 1] == b[j - 1]
+                    ? dp[i - 1, j - 1]
+                    : 1 + Math.Min(dp[i - 1, j - 1], Math.Min(dp[i - 1, j], dp[i, j - 1]));
+        return dp[m, n];
     }
 }

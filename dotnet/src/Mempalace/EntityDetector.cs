@@ -73,6 +73,9 @@ public static class EntityDetector
     private static readonly Regex CandidateWord =
         new(@"\b([A-Z][a-z]{1,19})\b", RegexOptions.Compiled);
 
+    private static readonly Regex CandidateCamelCase =
+        new(@"\b([A-Z][a-z]+[A-Z][a-zA-Z]+)\b", RegexOptions.Compiled);
+
     private static readonly Regex CandidatePhrase =
         new(@"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b", RegexOptions.Compiled);
 
@@ -213,6 +216,13 @@ public static class EntityDetector
         {
             var w = m.Value;
             if (w.Length > 1 && !Stopwords.Contains(w.ToLowerInvariant()))
+                counts[w] = counts.GetValueOrDefault(w) + 1;
+        }
+
+        foreach (Match m in CandidateCamelCase.Matches(text))
+        {
+            var w = m.Value;
+            if (!Stopwords.Contains(w.ToLowerInvariant()))
                 counts[w] = counts.GetValueOrDefault(w) + 1;
         }
 
