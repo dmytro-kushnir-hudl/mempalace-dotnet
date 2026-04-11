@@ -63,7 +63,7 @@ public sealed class T65_T72_ErrorHandlingTests(EmbedderFixture embedder) : IDisp
             McpHarness.Call(2, "mempalace_search",
                 new { query = "limit zero test", limit = 0 }));
 
-        Assert.Empty(s.Result(2)["Results"]!.AsArray());
+        Assert.Empty(s.Result(2)["results"]!.AsArray());
     }
 
     [Theory]
@@ -107,8 +107,8 @@ public sealed class T65_T72_ErrorHandlingTests(EmbedderFixture embedder) : IDisp
             McpHarness.Call(3, "mempalace_search",
                 new { query = unique }));
 
-        var results = s.Result(3)["Results"]!.AsArray();
-        Assert.Contains(results, r => r!["Text"]!.GetValue<string>().Contains(unique));
+        var results = s.Result(3)["results"]!.AsArray();
+        Assert.Contains(results, r => r!["text"]!.GetValue<string>().Contains(unique));
     }
 
     [Theory]
@@ -130,8 +130,8 @@ public sealed class T65_T72_ErrorHandlingTests(EmbedderFixture embedder) : IDisp
         var sB = await McpHarness.SessionAsync(ctxB,
             McpHarness.Call(2, "mempalace_search", new { query = unique }));
 
-        var results = sB.Result(2)["Results"]!.AsArray();
-        Assert.Contains(results, r => r!["Text"]!.GetValue<string>().Contains(unique));
+        var results = sB.Result(2)["results"]!.AsArray();
+        Assert.Contains(results, r => r!["text"]!.GetValue<string>().Contains(unique));
     }
 
     public void Dispose() => _factory.Dispose();

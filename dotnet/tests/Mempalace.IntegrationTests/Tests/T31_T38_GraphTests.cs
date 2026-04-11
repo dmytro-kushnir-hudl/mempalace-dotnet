@@ -31,10 +31,10 @@ public sealed class T31_T38_GraphTests(EmbedderFixture embedder) : IAsyncLifetim
             McpHarness.Call(2, "mempalace_graph_stats", new { }));
 
         var r = s.Result(2);
-        Assert.True(r["TotalRooms"]!.GetValue<int>() >= 3);
-        Assert.Equal(1, r["TunnelRooms"]!.GetValue<int>());
-        Assert.Equal(2, r["RoomsPerWing"]!["backend"]!.GetValue<int>());
-        Assert.Equal(2, r["RoomsPerWing"]!["frontend"]!.GetValue<int>());
+        Assert.True(r["totalRooms"]!.GetValue<int>() >= 3);
+        Assert.Equal(1, r["tunnelRooms"]!.GetValue<int>());
+        Assert.Equal(2, r["roomsPerWing"]!["backend"]!.GetValue<int>());
+        Assert.Equal(2, r["roomsPerWing"]!["frontend"]!.GetValue<int>());
     }
 
     [Theory]

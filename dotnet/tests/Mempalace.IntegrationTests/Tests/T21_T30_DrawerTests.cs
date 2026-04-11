@@ -97,8 +97,8 @@ public sealed class T21_T30_DrawerTests(EmbedderFixture embedder) : IAsyncLifeti
                 new { query = "regression test drawer" }));
 
         var testId  = s.Result(2)["drawer_id"]!.GetValue<string>();
-        var results = s.Result(3)["Results"]!.AsArray();
-        Assert.Contains(results, r => r!["Text"]!.GetValue<string>().Contains("Regression test drawer"));
+        var results = s.Result(3)["results"]!.AsArray();
+        Assert.Contains(results, r => r!["text"]!.GetValue<string>().Contains("Regression test drawer"));
         _ = testId; // used implicitly via search content
     }
 
@@ -152,8 +152,8 @@ public sealed class T21_T30_DrawerTests(EmbedderFixture embedder) : IAsyncLifeti
 
         Assert.True(s2.Result(2)["success"]!.GetValue<bool>());
 
-        var results = s2.Result(3)["Results"]!.AsArray();
-        Assert.DoesNotContain(results, r => r!["Text"]!.GetValue<string>().Contains("xyzzy"));
+        var results = s2.Result(3)["results"]!.AsArray();
+        Assert.DoesNotContain(results, r => r!["text"]!.GetValue<string>().Contains("xyzzy"));
     }
 
     [Theory]

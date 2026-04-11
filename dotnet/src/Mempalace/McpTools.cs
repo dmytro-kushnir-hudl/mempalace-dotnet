@@ -32,6 +32,12 @@ public sealed class McpToolContext(
 
 public static class McpTools
 {
+    // All tool responses use camelCase for consistency.
+    private static readonly JsonSerializerOptions CamelCase = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
+
     private static readonly string WalDir  = Path.Combine(Constants.DefaultConfigDir, "wal");
     private static readonly string WalFile = Path.Combine(WalDir, "write_log.jsonl");
 
@@ -148,13 +154,13 @@ public static class McpTools
         string? wing = null, string? room = null, CancellationToken ct = default)
     {
         if (limit <= 0)
-            return JsonNode.Parse(JsonSerializer.Serialize(new { Query = query, Wing = wing, Room = room, Results = Array.Empty<object>() }))!;
+            return JsonNode.Parse(JsonSerializer.Serialize(new { query, wing, room, results = Array.Empty<object>() }, CamelCase))!;
         try
         {
             var response = await Searcher.SearchMemoriesAsync(
                 query, ctx.PalacePath, ctx.Embedder, wing, room, limit,
                 ctx.CollectionName, ctx.Backend, ct);
-            return JsonNode.Parse(JsonSerializer.Serialize(response))!;
+            return JsonNode.Parse(JsonSerializer.Serialize(response, CamelCase))!;
         }
         catch (SearchError ex) { return new JsonObject { ["error"] = ex.Message }; }
     }
@@ -204,7 +210,7 @@ public static class McpTools
         {
             using var s = ctx.OpenPalace();
             var stats = PalaceGraph.GraphStats(s.Collection);
-            return JsonNode.Parse(JsonSerializer.Serialize(stats))!;
+            return JsonNode.Parse(JsonSerializer.Serialize(stats, CamelCase))!;
         }
         catch { return NoPalace(); }
     }
@@ -347,7 +353,7 @@ public static class McpTools
         {
             using var kg = ctx.OpenKg();
             var triples = kg.QueryEntity(entity, asOf, direction);
-            return JsonNode.Parse(JsonSerializer.Serialize(new { entity, triples }))!;
+            return JsonNode.Parse(JsonSerializer.Serialize(new { entity, triples }, CamelCase))!;
         }
         catch (Exception ex) { return new JsonObject { ["error"] = ex.Message }; }
     }
@@ -385,7 +391,7 @@ public static class McpTools
         try
         {
             using var kg = ctx.OpenKg();
-            return JsonNode.Parse(JsonSerializer.Serialize(new { timeline = kg.Timeline(entity) }))!;
+            return JsonNode.Parse(JsonSerializer.Serialize(new { timeline = kg.Timeline(entity) }, CamelCase))!;
         }
         catch (Exception ex) { return new JsonObject { ["error"] = ex.Message }; }
     }
@@ -395,7 +401,7 @@ public static class McpTools
         try
         {
             using var kg = ctx.OpenKg();
-            return JsonNode.Parse(JsonSerializer.Serialize(kg.Stats()))!;
+            return JsonNode.Parse(JsonSerializer.Serialize(kg.Stats(), CamelCase))!;
         }
         catch (Exception ex) { return new JsonObject { ["error"] = ex.Message }; }
     }
