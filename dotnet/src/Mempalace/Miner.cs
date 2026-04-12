@@ -570,12 +570,19 @@ internal sealed class MineProgress(string root)
     private static readonly string[] Spinner = ["⠋", "⠙", "⠚", "⠞", "⠖", "⠦", "⠴", "⠲", "⠳", "⠵"];
     private static readonly bool IsTty = !Console.IsErrorRedirected;
 
+    private const long WindowTicks = 10 * TimeSpan.TicksPerSecond; // 10-second tumbling window
+
     private readonly Stopwatch _sw = Stopwatch.StartNew();
     private int _chunks;
     private string _current = "";
     private int _files;
     private int _skipped;
     private int _spin;
+
+    // Tumbling-window rate: (chunksAtWindowStart, ticksAtWindowStart) packed into a long[2]
+    // swapped atomically via CAS when the window expires.
+    private long _windowStartChunks;
+    private long _windowStartTicks = Stopwatch.GetTimestamp();
 
     public void File(string path, bool skipped)
     {
@@ -599,17 +606,42 @@ internal sealed class MineProgress(string root)
     public void Done(int mined, int skipped, string wing)
     {
         if (IsTty) Console.Error.Write("\r" + new string(' ', Math.Max(80, Console.WindowWidth - 1)) + "\r");
+        var avg = _chunks / Math.Max(_sw.Elapsed.TotalSeconds, 0.001);
         Console.Error.WriteLine(
             $"⛏  done  {mined} mined  {skipped} skipped  {_chunks} chunks  " +
-            $"{_chunks / Math.Max(_sw.Elapsed.TotalSeconds, 0.001):0.#}/s  → {wing}");
+            $"avg {avg:0.#}/s  → {wing}");
+    }
+
+    private double WindowRate()
+    {
+        var nowTicks  = Stopwatch.GetTimestamp();
+        var nowChunks = (long)_chunks;                          // int read is atomic on 64-bit
+        var winTicks  = Interlocked.Read(ref _windowStartTicks);
+        var winChunks = Interlocked.Read(ref _windowStartChunks);
+        var elapsed   = nowTicks - winTicks;
+
+        if (elapsed >= WindowTicks)
+        {
+            // Window expired — one caller wins the CAS and resets the baseline;
+            // losers fall through and report rate over the just-expired window anyway.
+            if (Interlocked.CompareExchange(ref _windowStartTicks, nowTicks, winTicks) == winTicks)
+                Interlocked.Exchange(ref _windowStartChunks, nowChunks);
+
+            var secs = elapsed / (double)Stopwatch.Frequency;
+            return (nowChunks - winChunks) / Math.Max(secs, 0.001);
+        }
+
+        var windowSecs = elapsed / (double)Stopwatch.Frequency;
+        return (nowChunks - winChunks) / Math.Max(windowSecs, 0.001);
     }
 
     private void Render()
     {
         if (!IsTty) return;
-        var rate = _chunks / Math.Max(_sw.Elapsed.TotalSeconds, 0.001);
+        var rate = WindowRate();
         var spin = Spinner[_spin];
-        var prefix = $"⛏  {spin}  {_files} files  {_skipped} skipped  {_chunks} chunks  {rate:0.#}/s  ";
+        var avg = _chunks / Math.Max(_sw.Elapsed.TotalSeconds, 0.001);
+        var prefix = $"⛏  {spin}  {_files} files  {_skipped} skipped  {_chunks} chunks  {rate:0.#}/s (avg {avg:0.#})  ";
         var width = Math.Max(40, Console.WindowWidth - 1);
         var pathBudget = width - prefix.Length;
         var path = pathBudget > 3 && _current.Length > pathBudget
