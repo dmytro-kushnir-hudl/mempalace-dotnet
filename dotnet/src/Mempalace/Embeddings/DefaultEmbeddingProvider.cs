@@ -228,18 +228,25 @@ public sealed class DefaultEmbeddingProvider
 
             for (int t = 0; t < len; t++)
                 inputIds[baseIdx + t] = ids[t];
-            // Zero the padding slots — rented array is dirty
-            Unsafe.InitBlockUnaligned(
-                ref Unsafe.As<long, byte>(ref inputIds[padStart]),
-                0,
-                (uint)(padLen * sizeof(long)));
+            // Zero padding slots — rented array is dirty; guard padLen>0 to avoid
+            // out-of-bounds ref when len==MaxTokens (text fills all slots exactly)
+            if (padLen > 0)
+            {
+                Unsafe.InitBlockUnaligned(
+                    ref Unsafe.As<long, byte>(ref inputIds[padStart]),
+                    0,
+                    (uint)(padLen * sizeof(long)));
+            }
 
             for (int t = 0; t < len; t++)
                 attentionMask[baseIdx + t] = 1L;
-            Unsafe.InitBlockUnaligned(
-                ref Unsafe.As<long, byte>(ref attentionMask[padStart]),
-                0,
-                (uint)(padLen * sizeof(long)));
+            if (padLen > 0)
+            {
+                Unsafe.InitBlockUnaligned(
+                    ref Unsafe.As<long, byte>(ref attentionMask[padStart]),
+                    0,
+                    (uint)(padLen * sizeof(long)));
+            }
         }
 
         int[] dims = [batch, MaxTokens];
