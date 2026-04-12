@@ -27,7 +27,7 @@ public sealed record ConvoMinerOptions(
     int Limit = 0,
     bool DryRun = false,
     string ExtractMode = "exchange",
-    VectorBackend Backend = VectorBackend.Chroma);
+    VectorBackend Backend = VectorBackend.Sqlite);
 
 // ---------------------------------------------------------------------------
 // ConvoMiner

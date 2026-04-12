@@ -1,5 +1,5 @@
 using System.CommandLine;
-using Chroma.Embeddings;
+using Mempalace.Embeddings;
 using Mempalace;
 
 // ---------------------------------------------------------------------------

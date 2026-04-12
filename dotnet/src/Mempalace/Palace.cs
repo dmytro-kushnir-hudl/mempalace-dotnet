@@ -4,7 +4,6 @@ namespace Mempalace;
 
 public enum VectorBackend
 {
-    Chroma,
     Sqlite
 }
 
@@ -34,12 +33,11 @@ public sealed class PalaceSession : IDisposable
     public static PalaceSession Open(
         string palacePath,
         string collectionName = Constants.DefaultCollectionName,
-        VectorBackend backend = VectorBackend.Chroma)
+        VectorBackend backend = VectorBackend.Sqlite)
     {
         Directory.CreateDirectory(palacePath);
         IVectorCollection col = backend switch
         {
-            VectorBackend.Chroma => new ChromaVectorCollection(palacePath, collectionName),
             VectorBackend.Sqlite => new SqliteVectorCollection(
                 Path.Combine(palacePath, "palace.sqlite3"), 384),
             _ => throw new ArgumentOutOfRangeException(nameof(backend))

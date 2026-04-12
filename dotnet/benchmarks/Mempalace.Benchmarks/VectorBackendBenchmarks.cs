@@ -1,8 +1,8 @@
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Order;
 using BenchmarkDotNet.Running;
-using Chroma.Embeddings;
 using Mempalace;
+using Mempalace.Embeddings;
 using Mempalace.Storage;
 using Microsoft.Extensions.AI;
 
@@ -13,7 +13,7 @@ var summary = BenchmarkRunner.Run<VectorBackendBenchmarks>();
 // ── Benchmark class ───────────────────────────────────────────────────────────
 
 /// <summary>
-///     Compares SQLite and Chroma backends across the three hot-path operations:
+///     SQLite backend benchmarks across the three hot-path operations:
 ///     - UpsertAsync   (add a drawer)
 ///     - SearchAsync   (semantic search)
 ///     - Get           (metadata-filtered list)
@@ -52,8 +52,6 @@ public class VectorBackendBenchmarks : IDisposable
         "Dead-letter queue processing retries failed events up to 3 times."
     ];
 
-    private string _chromaPalace = null!;
-
     // ── State ─────────────────────────────────────────────────────────────────
 
     private DefaultEmbeddingProvider _embedder = null!;
@@ -81,12 +79,9 @@ public class VectorBackendBenchmarks : IDisposable
     {
         _embedder = await DefaultEmbeddingProvider.CreateAsync();
         _sqlitePalace = Path.Combine(Path.GetTempPath(), $"bench_sqlite_{Guid.NewGuid():N}");
-        _chromaPalace = Path.Combine(Path.GetTempPath(), $"bench_chroma_{Guid.NewGuid():N}");
         Directory.CreateDirectory(_sqlitePalace);
-        Directory.CreateDirectory(_chromaPalace);
 
-        await SeedPalaceAsync(VectorBackend.Sqlite, _sqlitePalace);
-        await SeedPalaceAsync(VectorBackend.Chroma, _chromaPalace);
+        await SeedPalaceAsync(_sqlitePalace);
 
         // Pre-warm: embed the search query once
         var gen = await _embedder.GenerateAsync(["auth JWT token"]);
@@ -98,7 +93,6 @@ public class VectorBackendBenchmarks : IDisposable
     {
         _embedder.Dispose();
         if (Directory.Exists(_sqlitePalace)) Directory.Delete(_sqlitePalace, true);
-        if (Directory.Exists(_chromaPalace)) Directory.Delete(_chromaPalace, true);
     }
 
     // ── Benchmarks ─────────────────────────────────────────────────────────────
@@ -113,28 +107,12 @@ public class VectorBackendBenchmarks : IDisposable
         await session.Collection.UpsertAsync([id], [doc], _embedder, [meta]);
     }
 
-    [Benchmark]
-    public async Task Chroma_Upsert()
-    {
-        var (id, doc, meta) = NextDrawer();
-        using var session = PalaceSession.Open(_chromaPalace, backend: VectorBackend.Chroma);
-        await session.Collection.UpsertAsync([id], [doc], _embedder, [meta]);
-    }
-
     // ── SearchAsync ────────────────────────────────────────────────────────────
 
     [Benchmark]
     public async Task<int> Sqlite_Search()
     {
         using var session = PalaceSession.Open(_sqlitePalace, backend: VectorBackend.Sqlite);
-        var results = await session.Collection.SearchAsync("auth JWT token", _embedder, 5);
-        return results.Length;
-    }
-
-    [Benchmark]
-    public async Task<int> Chroma_Search()
-    {
-        using var session = PalaceSession.Open(_chromaPalace, backend: VectorBackend.Chroma);
         var results = await session.Collection.SearchAsync("auth JWT token", _embedder, 5);
         return results.Length;
     }
@@ -149,14 +127,6 @@ public class VectorBackendBenchmarks : IDisposable
         return session.Collection.Get(filter, limit: 100).Length;
     }
 
-    [Benchmark]
-    public int Chroma_GetFiltered()
-    {
-        using var session = PalaceSession.Open(_chromaPalace, backend: VectorBackend.Chroma);
-        var filter = MetadataFilter.Where("wing", "backend");
-        return session.Collection.Get(filter, limit: 100).Length;
-    }
-
     // ── Count ──────────────────────────────────────────────────────────────────
 
     [Benchmark]
@@ -166,18 +136,11 @@ public class VectorBackendBenchmarks : IDisposable
         return session.Collection.Count();
     }
 
-    [Benchmark]
-    public int Chroma_Count()
-    {
-        using var session = PalaceSession.Open(_chromaPalace, backend: VectorBackend.Chroma);
-        return session.Collection.Count();
-    }
-
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private async Task SeedPalaceAsync(VectorBackend backend, string palacePath)
+    private async Task SeedPalaceAsync(string palacePath)
     {
-        using var session = PalaceSession.Open(palacePath, backend: backend);
+        using var session = PalaceSession.Open(palacePath, backend: VectorBackend.Sqlite);
         var wings = new[] { "backend", "frontend", "infra" };
         var rooms = new[] { "auth", "database", "api", "components", "config" };
 
@@ -208,7 +171,6 @@ public class VectorBackendBenchmarks : IDisposable
         for (var offset = 0; offset < WarmupDrawerCount; offset += BatchSize)
         {
             var end = Math.Min(offset + BatchSize, WarmupDrawerCount);
-            var len = end - offset;
             await session.Collection.UpsertAsync(
                 ids[offset..end], docs[offset..end], _embedder,
                 metas[offset..end]);

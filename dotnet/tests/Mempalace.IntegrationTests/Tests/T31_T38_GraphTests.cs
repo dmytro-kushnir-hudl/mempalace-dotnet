@@ -7,15 +7,12 @@ namespace Mempalace.IntegrationTests.Tests;
 public sealed class T31_T38_GraphTests(EmbedderFixture embedder) : IAsyncLifetime, IDisposable
 {
     private readonly PalaceFactory _factory = new(embedder.Embedder);
-    private McpToolContext _chromaCtx = null!;
     private McpToolContext _sqliteCtx = null!;
 
     public async ValueTask InitializeAsync()
     {
         (_sqliteCtx, _) = _factory.CreateContext();
-        (_chromaCtx, _) = _factory.CreateContext(VectorBackend.Chroma);
         await Seed.ApplyAsync(_sqliteCtx);
-        await Seed.ApplyAsync(_chromaCtx);
     }
 
     public ValueTask DisposeAsync()
@@ -28,12 +25,10 @@ public sealed class T31_T38_GraphTests(EmbedderFixture embedder) : IAsyncLifetim
         _factory.Dispose();
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T31_GraphStats_CorrectCounts(VectorBackend backend)
+    [Fact]
+    public async Task T31_GraphStats_CorrectCounts()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_graph_stats", new { }));
 
@@ -44,12 +39,10 @@ public sealed class T31_T38_GraphTests(EmbedderFixture embedder) : IAsyncLifetim
         Assert.Equal(2, r["roomsPerWing"]!["frontend"]!.GetValue<int>());
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T32_FindTunnels_NoFilter_AuthBridgesWings(VectorBackend backend)
+    [Fact]
+    public async Task T32_FindTunnels_NoFilter_AuthBridgesWings()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_find_tunnels", new { }));
 
@@ -62,12 +55,10 @@ public sealed class T31_T38_GraphTests(EmbedderFixture embedder) : IAsyncLifetim
         Assert.Contains("frontend", wings);
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T33_FindTunnels_WingAFilter_AllContainBackend(VectorBackend backend)
+    [Fact]
+    public async Task T33_FindTunnels_WingAFilter_AllContainBackend()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_find_tunnels", new { wing_a = "backend" }));
 
@@ -79,12 +70,10 @@ public sealed class T31_T38_GraphTests(EmbedderFixture embedder) : IAsyncLifetim
         }
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T34_FindTunnels_BothWings_OnlyAuth(VectorBackend backend)
+    [Fact]
+    public async Task T34_FindTunnels_BothWings_OnlyAuth()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_find_tunnels",
                 new { wing_a = "backend", wing_b = "frontend" }));
@@ -94,12 +83,10 @@ public sealed class T31_T38_GraphTests(EmbedderFixture embedder) : IAsyncLifetim
         Assert.Equal("auth", tunnels[0]!["Room"]!.GetValue<string>());
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T35_FindTunnels_NonexistentWing_Empty(VectorBackend backend)
+    [Fact]
+    public async Task T35_FindTunnels_NonexistentWing_Empty()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_find_tunnels",
                 new { wing_a = "backend", wing_b = "nonexistent" }));
@@ -107,12 +94,10 @@ public sealed class T31_T38_GraphTests(EmbedderFixture embedder) : IAsyncLifetim
         Assert.Empty(s.Result(2)["tunnels"]!.AsArray());
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T36_TraverseGraph_AuthRoom_Hop0ThenHop1(VectorBackend backend)
+    [Fact]
+    public async Task T36_TraverseGraph_AuthRoom_Hop0ThenHop1()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_traverse_graph",
                 new { start_room = "auth", max_hops = 1 }));
@@ -125,12 +110,10 @@ public sealed class T31_T38_GraphTests(EmbedderFixture embedder) : IAsyncLifetim
         Assert.True(nodes.Count > 1, "Expected hop-1 nodes");
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T37_TraverseGraph_TypoStartRoom_SuggestsAuth(VectorBackend backend)
+    [Fact]
+    public async Task T37_TraverseGraph_TypoStartRoom_SuggestsAuth()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_traverse_graph",
                 new { start_room = "autth", max_hops = 1 }));
@@ -142,12 +125,10 @@ public sealed class T31_T38_GraphTests(EmbedderFixture embedder) : IAsyncLifetim
         Assert.Contains("auth", suggestions);
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T38_TraverseGraph_MaxHops0_ExactlyOneNode(VectorBackend backend)
+    [Fact]
+    public async Task T38_TraverseGraph_MaxHops0_ExactlyOneNode()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_traverse_graph",
                 new { start_room = "auth", max_hops = 0 }));

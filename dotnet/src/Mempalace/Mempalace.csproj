@@ -8,11 +8,8 @@
         <Version>0.1.0</Version>
         <EnableNETAnalyzers>true</EnableNETAnalyzers>
         <AnalysisLevel>latest-recommended</AnalysisLevel>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
-
-    <ItemGroup>
-        <ProjectReference Include="../../../../chroma/clients/dotnet/src/Chroma.Client/Chroma.Client.csproj"/>
-    </ItemGroup>
 
     <ItemGroup>
         <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
@@ -24,5 +21,8 @@
         <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.4.1"/>
         <PackageReference Include="YamlDotNet" Version="17.0.1"/>
         <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.5"/>
+        <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.24.1"/>
+        <PackageReference Include="Microsoft.ML.Tokenizers" Version="0.22.0"/>
+        <PackageReference Include="System.Numerics.Tensors" Version="9.0.4"/>
     </ItemGroup>
 </Project>

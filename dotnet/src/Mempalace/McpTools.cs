@@ -16,7 +16,7 @@ public sealed class McpToolContext(
     string collectionName,
     string kgPath,
     IEmbeddingGenerator<string, Embedding<float>> embedder,
-    VectorBackend backend = VectorBackend.Chroma)
+    VectorBackend backend = VectorBackend.Sqlite)
 {
     public string PalacePath { get; } = palacePath;
     public string CollectionName { get; } = collectionName;

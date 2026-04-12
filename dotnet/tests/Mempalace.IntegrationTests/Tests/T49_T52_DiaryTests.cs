@@ -15,7 +15,6 @@ public sealed class T49_T52_DiaryTests(EmbedderFixture embedder) : IDisposable
 
     [Theory]
     [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
     public async Task T49_DiaryWrite_ReturnsEntryIdWithPrefix(VectorBackend backend)
     {
         var (ctx, _) = _factory.CreateContext(backend);
@@ -34,7 +33,6 @@ public sealed class T49_T52_DiaryTests(EmbedderFixture embedder) : IDisposable
 
     [Theory]
     [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
     public async Task T50_DiaryRead_ReturnsEntryWithTopic(VectorBackend backend)
     {
         var (ctx, _) = _factory.CreateContext(backend);
@@ -56,7 +54,6 @@ public sealed class T49_T52_DiaryTests(EmbedderFixture embedder) : IDisposable
 
     [Theory]
     [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
     public async Task T51_DiaryRead_UnknownAgent_ReturnsEmpty(VectorBackend backend)
     {
         var (ctx, _) = _factory.CreateContext(backend);
@@ -70,7 +67,6 @@ public sealed class T49_T52_DiaryTests(EmbedderFixture embedder) : IDisposable
 
     [Theory]
     [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
     public async Task T52_DiaryRead_LastN_RespectsLimit(VectorBackend backend)
     {
         var (ctx, _) = _factory.CreateContext(backend);

@@ -7,15 +7,12 @@ namespace Mempalace.IntegrationTests.Tests;
 public sealed class T13_T20_SearchTests(EmbedderFixture embedder) : IAsyncLifetime, IDisposable
 {
     private readonly PalaceFactory _factory = new(embedder.Embedder);
-    private McpToolContext _chromaCtx = null!;
     private McpToolContext _sqliteCtx = null!;
 
     public async ValueTask InitializeAsync()
     {
         (_sqliteCtx, _) = _factory.CreateContext();
-        (_chromaCtx, _) = _factory.CreateContext(VectorBackend.Chroma);
         await Seed.ApplyAsync(_sqliteCtx);
-        await Seed.ApplyAsync(_chromaCtx);
     }
 
     public ValueTask DisposeAsync()
@@ -28,12 +25,10 @@ public sealed class T13_T20_SearchTests(EmbedderFixture embedder) : IAsyncLifeti
         _factory.Dispose();
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T13_Search_JwtQuery_ReturnsRelevantResult(VectorBackend backend)
+    [Fact]
+    public async Task T13_Search_JwtQuery_ReturnsRelevantResult()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_search", new { query = "JWT authentication tokens" }));
 
@@ -45,12 +40,10 @@ public sealed class T13_T20_SearchTests(EmbedderFixture embedder) : IAsyncLifeti
         Assert.True(text.Contains("jwt") || text.Contains("auth") || text.Contains("token"));
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T14_Search_PostgresQuery_SortedBySimilarity(VectorBackend backend)
+    [Fact]
+    public async Task T14_Search_PostgresQuery_SortedBySimilarity()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_search", new { query = "PostgreSQL migration database" }));
 
@@ -66,12 +59,10 @@ public sealed class T13_T20_SearchTests(EmbedderFixture embedder) : IAsyncLifeti
         Assert.True(topText.Contains("postgresql") || topText.Contains("migration") || topText.Contains("mysql"));
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T15_Search_WingFilter_OnlyFrontendResults(VectorBackend backend)
+    [Fact]
+    public async Task T15_Search_WingFilter_OnlyFrontendResults()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_search", new { query = "auth", wing = "frontend" }));
 
@@ -81,12 +72,10 @@ public sealed class T13_T20_SearchTests(EmbedderFixture embedder) : IAsyncLifeti
             Assert.Equal("frontend", r!["wing"]!.GetValue<string>());
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T16_Search_RoomFilter_OnlyDatabaseResults(VectorBackend backend)
+    [Fact]
+    public async Task T16_Search_RoomFilter_OnlyDatabaseResults()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_search", new { query = "auth", room = "database" }));
 
@@ -95,12 +84,10 @@ public sealed class T13_T20_SearchTests(EmbedderFixture embedder) : IAsyncLifeti
             Assert.Equal("database", r!["room"]!.GetValue<string>());
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T17_Search_WingAndRoomFilter_OnlyBackendAuth(VectorBackend backend)
+    [Fact]
+    public async Task T17_Search_WingAndRoomFilter_OnlyBackendAuth()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_search", new { query = "decisions", wing = "backend", room = "auth" }));
 
@@ -112,12 +99,10 @@ public sealed class T13_T20_SearchTests(EmbedderFixture embedder) : IAsyncLifeti
         }
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T18_Search_Limit2_AtMost2Results(VectorBackend backend)
+    [Fact]
+    public async Task T18_Search_Limit2_AtMost2Results()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_search", new { query = "auth", limit = 2 }));
 
@@ -136,12 +121,10 @@ public sealed class T13_T20_SearchTests(EmbedderFixture embedder) : IAsyncLifeti
         Assert.Empty(results);
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T20_Search_NonexistentWing_ReturnsEmpty(VectorBackend backend)
+    [Fact]
+    public async Task T20_Search_NonexistentWing_ReturnsEmpty()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_search", new { query = "anything", wing = "does_not_exist" }));
 

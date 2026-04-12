@@ -1,4 +1,4 @@
-using Chroma.Embeddings;
+using Mempalace.Embeddings;
 using Microsoft.Extensions.AI;
 
 namespace Mempalace.IntegrationTests.Harness;

@@ -18,7 +18,7 @@ public sealed class SearcherTests
         var f = Searcher.BuildFilter("tech", null);
         Assert.NotNull(f);
         Assert.Equal("tech", f!.Clauses["wing"]?.ToString());
-        Assert.Equal(1, f.Clauses.Count);
+        Assert.Single(f.Clauses);
     }
 
     [Fact]
@@ -27,7 +27,7 @@ public sealed class SearcherTests
         var f = Searcher.BuildFilter(null, "backend");
         Assert.NotNull(f);
         Assert.Equal("backend", f!.Clauses["room"]?.ToString());
-        Assert.Equal(1, f.Clauses.Count);
+        Assert.Single(f.Clauses);
     }
 
     [Fact]

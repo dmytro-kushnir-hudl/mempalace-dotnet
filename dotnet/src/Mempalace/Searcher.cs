@@ -40,7 +40,7 @@ public static class Searcher
         string? room = null,
         int nResults = 5,
         string collectionName = Constants.DefaultCollectionName,
-        VectorBackend backend = VectorBackend.Chroma,
+        VectorBackend backend = VectorBackend.Sqlite,
         CancellationToken ct = default)
     {
         PalaceSession session;

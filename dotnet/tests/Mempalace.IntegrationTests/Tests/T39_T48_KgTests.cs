@@ -7,15 +7,12 @@ namespace Mempalace.IntegrationTests.Tests;
 public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, IDisposable
 {
     private readonly PalaceFactory _factory = new(embedder.Embedder);
-    private McpToolContext _chromaCtx = null!;
     private McpToolContext _sqliteCtx = null!;
 
     public async ValueTask InitializeAsync()
     {
         (_sqliteCtx, _) = _factory.CreateContext();
-        (_chromaCtx, _) = _factory.CreateContext(VectorBackend.Chroma);
         await Seed.ApplyAsync(_sqliteCtx);
-        await Seed.ApplyAsync(_chromaCtx);
     }
 
     public ValueTask DisposeAsync()
@@ -28,12 +25,10 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
         _factory.Dispose();
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T39_KgStats_AfterSeeding(VectorBackend backend)
+    [Fact]
+    public async Task T39_KgStats_AfterSeeding()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_kg_stats", new { }));
 
@@ -48,12 +43,10 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
         Assert.Contains("uses", types);
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T40_KgQuery_RileyOutgoing_OwnsAuthService(VectorBackend backend)
+    [Fact]
+    public async Task T40_KgQuery_RileyOutgoing_OwnsAuthService()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_kg_query",
                 new { entity = "Riley", direction = "outgoing" }));
@@ -64,12 +57,10 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
             t!["object"]!.GetValue<string>() == "auth-service");
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T41_KgQuery_AuthServiceIncoming_RileyOwns(VectorBackend backend)
+    [Fact]
+    public async Task T41_KgQuery_AuthServiceIncoming_RileyOwns()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_kg_query",
                 new { entity = "auth-service", direction = "incoming" }));
@@ -80,12 +71,10 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
             t!["predicate"]!.GetValue<string>() == "owns");
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T42_KgQuery_AuthServiceBoth_OutgoingAndIncoming(VectorBackend backend)
+    [Fact]
+    public async Task T42_KgQuery_AuthServiceBoth_OutgoingAndIncoming()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_kg_query",
                 new { entity = "auth-service", direction = "both" }));
@@ -96,12 +85,10 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
         Assert.True(hasOutgoing && hasIncoming);
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T43_KgQuery_TemporalBeforeMigration_MysqlPresent(VectorBackend backend)
+    [Fact]
+    public async Task T43_KgQuery_TemporalBeforeMigration_MysqlPresent()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_kg_query",
                 new { entity = "auth-service", as_of = "2023-06-01" }));
@@ -112,12 +99,10 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
             t!["object"]!.GetValue<string>() == "mysql");
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T44_KgQuery_TemporalAfterMigration_MysqlAbsentJwtPresent(VectorBackend backend)
+    [Fact]
+    public async Task T44_KgQuery_TemporalAfterMigration_MysqlAbsentJwtPresent()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_kg_query",
                 new { entity = "auth-service", as_of = "2024-06-01" }));
@@ -131,12 +116,10 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
             t!["object"]!.GetValue<string>() == "jwt");
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T45_KgInvalidate_RileyOwns_NotReturnedAfterEndDate(VectorBackend backend)
+    [Fact]
+    public async Task T45_KgInvalidate_RileyOwns_NotReturnedAfterEndDate()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_kg_invalidate",
                 new { subject = "Riley", predicate = "owns", @object = "auth-service", ended = "2024-12-01" }),
@@ -150,24 +133,20 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
             t!["object"]!.GetValue<string>() == "auth-service");
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T46_KgTimeline_NoFilter_NonEmpty(VectorBackend backend)
+    [Fact]
+    public async Task T46_KgTimeline_NoFilter_NonEmpty()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_kg_timeline", new { }));
 
         Assert.NotEmpty(s.Result(2)["timeline"]!.AsArray());
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T47_KgTimeline_EntityFilter_OnlySamTriples(VectorBackend backend)
+    [Fact]
+    public async Task T47_KgTimeline_EntityFilter_OnlySamTriples()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_kg_timeline", new { entity = "Sam" }));
 
@@ -181,12 +160,10 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
         }
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T48_KgAdd_Duplicate_TriplesCountUnchanged(VectorBackend backend)
+    [Fact]
+    public async Task T48_KgAdd_Duplicate_TriplesCountUnchanged()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var before = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_kg_stats", new { }));
         var countBefore = before.Result(2)["triples"]!.GetValue<int>();

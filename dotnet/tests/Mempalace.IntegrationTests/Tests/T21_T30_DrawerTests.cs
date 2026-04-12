@@ -10,15 +10,12 @@ public sealed class T21_T30_DrawerTests(EmbedderFixture embedder) : IAsyncLifeti
         "We decided to use JWT tokens with RS256 signing because it allows stateless verification across microservices. The secret is stored in Vault.";
 
     private readonly PalaceFactory _factory = new(embedder.Embedder);
-    private McpToolContext _chromaCtx = null!;
     private McpToolContext _sqliteCtx = null!;
 
     public async ValueTask InitializeAsync()
     {
         (_sqliteCtx, _) = _factory.CreateContext();
-        (_chromaCtx, _) = _factory.CreateContext(VectorBackend.Chroma);
         await Seed.ApplyAsync(_sqliteCtx);
-        await Seed.ApplyAsync(_chromaCtx);
     }
 
     public ValueTask DisposeAsync()
@@ -33,12 +30,10 @@ public sealed class T21_T30_DrawerTests(EmbedderFixture embedder) : IAsyncLifeti
 
     // ── Deduplication ──────────────────────────────────────────────────────────
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T21_CheckDuplicate_ExactMatch_IsTrue(VectorBackend backend)
+    [Fact]
+    public async Task T21_CheckDuplicate_ExactMatch_IsTrue()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_check_duplicate",
                 new { content = ExactContent, threshold = 0.95 }));
@@ -48,12 +43,10 @@ public sealed class T21_T30_DrawerTests(EmbedderFixture embedder) : IAsyncLifeti
         Assert.NotEmpty(r["matches"]!.AsArray());
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T22_CheckDuplicate_LowThreshold_SimilarContentMatches(VectorBackend backend)
+    [Fact]
+    public async Task T22_CheckDuplicate_LowThreshold_SimilarContentMatches()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_check_duplicate",
                 new { content = "JWT token auth", threshold = 0.5 }));
@@ -61,12 +54,10 @@ public sealed class T21_T30_DrawerTests(EmbedderFixture embedder) : IAsyncLifeti
         Assert.True(s.Result(2)["is_duplicate"]!.GetValue<bool>());
     }
 
-    [Theory]
-    [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
-    public async Task T23_CheckDuplicate_UnrelatedContent_NotDuplicate(VectorBackend backend)
+    [Fact]
+    public async Task T23_CheckDuplicate_UnrelatedContent_NotDuplicate()
     {
-        var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
+        var ctx = _sqliteCtx;
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_check_duplicate",
                 new { content = "completely unrelated topic about baking bread", threshold = 0.99 }));
@@ -78,7 +69,6 @@ public sealed class T21_T30_DrawerTests(EmbedderFixture embedder) : IAsyncLifeti
 
     [Theory]
     [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
     public async Task T24_AddDrawer_ReturnsIdWithPrefix(VectorBackend backend)
     {
         var (ctx, _) = _factory.CreateContext(backend);
@@ -93,7 +83,6 @@ public sealed class T21_T30_DrawerTests(EmbedderFixture embedder) : IAsyncLifeti
 
     [Theory]
     [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
     public async Task T25_AddedDrawer_IsSearchable(VectorBackend backend)
     {
         var (ctx, _) = _factory.CreateContext(backend);
@@ -111,7 +100,6 @@ public sealed class T21_T30_DrawerTests(EmbedderFixture embedder) : IAsyncLifeti
 
     [Theory]
     [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
     public async Task T26_AddDrawer_Idempotent_SameIdReturned(VectorBackend backend)
     {
         var (ctx, _) = _factory.CreateContext(backend);
@@ -128,7 +116,6 @@ public sealed class T21_T30_DrawerTests(EmbedderFixture embedder) : IAsyncLifeti
 
     [Theory]
     [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
     public async Task T27_AddDrawer_EmptyWing_ReturnsError(VectorBackend backend)
     {
         var (ctx, _) = _factory.CreateContext(backend);
@@ -143,7 +130,6 @@ public sealed class T21_T30_DrawerTests(EmbedderFixture embedder) : IAsyncLifeti
 
     [Theory]
     [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
     public async Task T28_T29_DeleteDrawer_ThenNotSearchable(VectorBackend backend)
     {
         var (ctx, _) = _factory.CreateContext(backend);
@@ -165,7 +151,6 @@ public sealed class T21_T30_DrawerTests(EmbedderFixture embedder) : IAsyncLifeti
 
     [Theory]
     [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
     public async Task T30_DeleteDrawer_NotFound_ReturnsError(VectorBackend backend)
     {
         var (ctx, _) = _factory.CreateContext(backend);

@@ -32,7 +32,7 @@ public sealed class Layer0(string? identityPath = null)
 // Layer 1 — Essential story (~500-800 tokens, auto-generated from palace)
 // ---------------------------------------------------------------------------
 
-public sealed class Layer1(string? palacePath = null, string? wing = null, VectorBackend backend = VectorBackend.Chroma)
+public sealed class Layer1(string? palacePath = null, string? wing = null, VectorBackend backend = VectorBackend.Sqlite)
 {
     private const int MaxDrawers = 15;
     private const int MaxChars = 3_200;
@@ -119,7 +119,7 @@ public sealed class Layer1(string? palacePath = null, string? wing = null, Vecto
 // Layer 2 — On-demand retrieval (~200-500 tokens, filtered by wing/room)
 // ---------------------------------------------------------------------------
 
-public sealed class Layer2(string? palacePath = null, VectorBackend backend = VectorBackend.Chroma)
+public sealed class Layer2(string? palacePath = null, VectorBackend backend = VectorBackend.Sqlite)
 {
     private readonly string _palacePath = palacePath ?? Constants.DefaultPalacePath;
 
@@ -155,7 +155,7 @@ public sealed class Layer2(string? palacePath = null, VectorBackend backend = Ve
 // Layer 3 — Deep semantic search (unlimited depth)
 // ---------------------------------------------------------------------------
 
-public sealed class Layer3(string? palacePath = null, VectorBackend backend = VectorBackend.Chroma)
+public sealed class Layer3(string? palacePath = null, VectorBackend backend = VectorBackend.Sqlite)
 {
     private readonly string _palacePath = palacePath ?? Constants.DefaultPalacePath;
 
@@ -210,7 +210,7 @@ public sealed class MemoryStack
     private readonly string _palacePath;
 
     public MemoryStack(string? palacePath = null, string? identityPath = null,
-        VectorBackend backend = VectorBackend.Chroma)
+        VectorBackend backend = VectorBackend.Sqlite)
     {
         _palacePath = palacePath ?? Constants.DefaultPalacePath;
         _l0 = new Layer0(identityPath);

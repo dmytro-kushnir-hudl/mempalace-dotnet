@@ -15,7 +15,6 @@ public sealed class T65_T72_ErrorHandlingTests(EmbedderFixture embedder) : IDisp
 
     [Theory]
     [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
     public async Task T65_Search_MissingQuery_ReturnsError(VectorBackend backend)
     {
         var (ctx, _) = _factory.CreateContext(backend);
@@ -27,7 +26,6 @@ public sealed class T65_T72_ErrorHandlingTests(EmbedderFixture embedder) : IDisp
 
     [Theory]
     [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
     public async Task T66_DeleteNonexistent_ReturnsFalseNotCrash(VectorBackend backend)
     {
         var (ctx, _) = _factory.CreateContext(backend);
@@ -40,7 +38,6 @@ public sealed class T65_T72_ErrorHandlingTests(EmbedderFixture embedder) : IDisp
 
     [Theory]
     [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
     public async Task T67_TraverseGraph_EmptyPalace_NoCrash(VectorBackend backend)
     {
         var (ctx, _) = _factory.CreateContext(backend);
@@ -56,7 +53,6 @@ public sealed class T65_T72_ErrorHandlingTests(EmbedderFixture embedder) : IDisp
 
     [Theory]
     [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
     public async Task T68_Search_Limit0_ReturnsEmpty(VectorBackend backend)
     {
         var (ctx, _) = _factory.CreateContext(backend);
@@ -73,7 +69,6 @@ public sealed class T65_T72_ErrorHandlingTests(EmbedderFixture embedder) : IDisp
 
     [Theory]
     [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
     public async Task T69_KgQuery_UnknownEntity_ReturnsEmptyTriples(VectorBackend backend)
     {
         var (ctx, _) = _factory.CreateContext(backend);
@@ -87,7 +82,6 @@ public sealed class T65_T72_ErrorHandlingTests(EmbedderFixture embedder) : IDisp
 
     [Theory]
     [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
     public async Task T70_AddDrawer_VeryLongContent_Succeeds(VectorBackend backend)
     {
         var (ctx, _) = _factory.CreateContext(backend);
@@ -101,7 +95,6 @@ public sealed class T65_T72_ErrorHandlingTests(EmbedderFixture embedder) : IDisp
 
     [Theory]
     [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
     public async Task T71_AddThenImmediatelySearch_FindsNewDrawer(VectorBackend backend)
     {
         var (ctx, _) = _factory.CreateContext(backend);
@@ -118,7 +111,6 @@ public sealed class T65_T72_ErrorHandlingTests(EmbedderFixture embedder) : IDisp
 
     [Theory]
     [InlineData(VectorBackend.Sqlite)]
-    [InlineData(VectorBackend.Chroma)]
     public async Task T72_TwoSessions_SharedPalace_SecondSeesFirst(VectorBackend backend)
     {
         var (ctx, palacePath) = _factory.CreateContext(backend);
