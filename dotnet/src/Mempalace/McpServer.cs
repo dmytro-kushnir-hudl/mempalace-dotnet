@@ -31,8 +31,8 @@ public static async Task RunAsync(McpToolContext ctx,
         CancellationToken ct = default)
     {
         bool ownReader = reader is null, ownWriter = writer is null;
-        reader ??= new System.IO.StreamReader(Console.OpenStandardInput(), System.Text.Encoding.UTF8);
-        writer ??= new System.IO.StreamWriter(Console.OpenStandardOutput(), System.Text.Encoding.UTF8) { AutoFlush = true };
+        reader ??= new System.IO.StreamReader(Console.OpenStandardInput(), new System.Text.UTF8Encoding(false));
+        writer ??= new System.IO.StreamWriter(Console.OpenStandardOutput(), new System.Text.UTF8Encoding(false)) { AutoFlush = true };
 
         Console.Error.WriteLine("[mempalace] MCP server started");
 

@@ -30,7 +30,7 @@ var palaceOpt  = new Option<string>("--palace", []) { Description = "Path to pal
 palaceOpt.DefaultValueFactory = _ => config.PalacePath;
 
 var backendOpt = new Option<VectorBackend>("--backend", []) { Description = "Vector store backend: Chroma | Sqlite", Recursive = true };
-backendOpt.DefaultValueFactory = _ => VectorBackend.Chroma;
+backendOpt.DefaultValueFactory = _ => VectorBackend.Sqlite;
 
 rootCmd.Add(palaceOpt);
 rootCmd.Add(backendOpt);

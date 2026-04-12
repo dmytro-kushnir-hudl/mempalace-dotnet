@@ -107,6 +107,28 @@ public sealed class ChromaVectorCollection : IVectorCollection
 
     public int Count() => (int)_col.Count();
 
+    public Dictionary<string, double> LoadMinedMtimes()
+    {
+        var rows = _col.Get(include: [Chroma.Include.Metadatas], limit: int.MaxValue);
+        var result = new Dictionary<string, double>(StringComparer.Ordinal);
+        var metas = rows.Metadatas;
+        if (metas is null) return result;
+        foreach (var meta in metas)
+        {
+            if (meta is null) continue;
+            if (!meta.TryGetValue("source_file", out var sf) || sf is not string path) continue;
+            if (!meta.TryGetValue("source_mtime", out var mt)) continue;
+            var mtime = mt switch {
+                double d => d,
+                System.Text.Json.JsonElement je => je.GetDouble(),
+                _ => Convert.ToDouble(mt)
+            };
+            if (!result.TryGetValue(path, out var existing) || mtime > existing)
+                result[path] = mtime;
+        }
+        return result;
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     internal static JsonNode ToJsonNode(MetadataFilter filter)

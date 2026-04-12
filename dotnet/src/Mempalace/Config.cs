@@ -45,7 +45,8 @@ public static class Constants
         ".txt", ".md", ".py", ".js", ".ts", ".jsx", ".tsx", ".json",
         ".yaml", ".yml", ".html", ".css", ".java", ".go", ".rs", ".rb",
         ".sh", ".csv", ".sql", ".toml", ".cs", ".fs", ".kt", ".swift",
-        ".cpp", ".c", ".h", ".hpp",
+        ".cpp", ".c", ".h", ".hpp", ".csproj", ".fsproj", ".vbproj",
+        ".sln", ".slnx", ".props", ".targets",
     };
 
     public static readonly IReadOnlySet<string> SkipFilenames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)

@@ -573,11 +573,35 @@ def mine(
     else:
         collection = None
 
+    import time, shutil, sys
+
     total_drawers = 0
     files_skipped = 0
     room_counts = defaultdict(int)
+    t_start = time.monotonic()
+    is_tty = sys.stderr.isatty()
+    spinner = ["⠋","⠙","⠚","⠞","⠖","⠦","⠴","⠲","⠳","⠵"]
+    spin_i = 0
+
+    def _render(current_path=""):
+        if not is_tty:
+            return
+        elapsed = max(time.monotonic() - t_start, 0.001)
+        rate = total_drawers / elapsed
+        cols = shutil.get_terminal_size().columns - 1
+        sp = spinner[spin_i % len(spinner)]
+        prefix = f"⛏  {sp}  {len(files) - files_skipped} files  {files_skipped} skipped  {total_drawers} chunks  {rate:.1f}/s  "
+        budget = cols - len(prefix)
+        rel = str(current_path.relative_to(project_path)) if current_path else ""
+        if budget > 3 and len(rel) > budget:
+            rel = "…" + rel[-(budget - 1):]
+        line = (prefix + rel)[:cols]
+        sys.stderr.write(f"\r{line:<{cols}}")
+        sys.stderr.flush()
 
     for i, filepath in enumerate(files, 1):
+        spin_i += 1
+        _render(filepath)
         drawers, room = process_file(
             filepath=filepath,
             project_path=project_path,
@@ -592,19 +616,15 @@ def mine(
         else:
             total_drawers += drawers
             room_counts[room] += 1
-            if not dry_run:
-                print(f"  ✓ [{i:4}/{len(files)}] {filepath.name[:50]:50} +{drawers}")
 
-    print(f"\n{'=' * 55}")
-    print("  Done.")
-    print(f"  Files processed: {len(files) - files_skipped}")
-    print(f"  Files skipped (already filed): {files_skipped}")
-    print(f"  Drawers filed: {total_drawers}")
-    print("\n  By room:")
-    for room, count in sorted(room_counts.items(), key=lambda x: x[1], reverse=True):
-        print(f"    {room:20} {count} files")
-    print('\n  Next: mempalace search "what you\'re looking for"')
-    print(f"{'=' * 55}\n")
+    if is_tty:
+        cols = shutil.get_terminal_size().columns - 1
+        sys.stderr.write("\r" + " " * cols + "\r")
+        sys.stderr.flush()
+
+    elapsed = max(time.monotonic() - t_start, 0.001)
+    rate = total_drawers / elapsed
+    print(f"⛏  done  {len(files) - files_skipped} mined  {files_skipped} skipped  {total_drawers} chunks  {rate:.1f}/s  → {wing}")
 
 
 # =============================================================================

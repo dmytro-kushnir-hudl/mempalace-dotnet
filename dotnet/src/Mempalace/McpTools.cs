@@ -92,6 +92,7 @@ public static class McpTools
                 wings,
                 rooms,
                 palace_path = ctx.PalacePath,
+                backend     = ctx.Backend.ToString(),
                 protocol    = PalaceProtocol,
                 aaak_dialect = AaakSpec,
             }))!;

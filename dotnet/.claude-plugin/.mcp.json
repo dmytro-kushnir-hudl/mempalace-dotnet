@@ -6,7 +6,9 @@
       "--project",
       "${CLAUDE_PLUGIN_ROOT}/../src/Mempalace.Cli",
       "--",
-      "mcp"
+      "mcp",
+      "--backend",
+      "Sqlite"
     ]
   }
 }

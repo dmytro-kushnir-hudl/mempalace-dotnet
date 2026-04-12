@@ -10,8 +10,8 @@
   "commands": [],
   "mcpServers": {
     "mempalace": {
-      "command": "${CLAUDE_PLUGIN_ROOT}/../src/Mempalace.Cli/bin/Release/net10.0/mempalace-dotnet",
-      "args": ["mcp"]
+      "command": "${CLAUDE_PLUGIN_ROOT}/src/Mempalace.Cli/bin/Release/net10.0/mempalace-dotnet",
+      "args": ["mcp", "--backend", "Sqlite"]
     }
   },
   "keywords": [

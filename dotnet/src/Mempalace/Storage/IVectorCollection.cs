@@ -44,6 +44,9 @@ public interface IVectorCollection : IDisposable
         bool includeMetadatas = true);
 
     int Count();
+
+    /// <summary>Returns max source_mtime per source_file for all mined files. One-shot bulk load.</summary>
+    Dictionary<string, double> LoadMinedMtimes();
 }
 
 public sealed record VectorRecord(

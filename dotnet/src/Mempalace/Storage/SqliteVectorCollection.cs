@@ -38,6 +38,9 @@ public sealed class SqliteVectorCollection : IVectorCollection
         _conn.Open();
 
         Execute("PRAGMA journal_mode=WAL;");
+        Execute("PRAGMA synchronous=NORMAL;");
+        Execute("PRAGMA cache_size=-32000;");   // 32 MB page cache
+        Execute("PRAGMA temp_store=MEMORY;");
         Execute("PRAGMA foreign_keys=ON;");
 
         // Try to load sqlite-vec extension
@@ -338,6 +341,18 @@ public sealed class SqliteVectorCollection : IVectorCollection
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = "SELECT COUNT(*) FROM drawers;";
         return Convert.ToInt32(cmd.ExecuteScalar());
+    }
+
+    /// <summary>Load max(source_mtime) per source_file in one query — for fast already-mined checks.</summary>
+    public Dictionary<string, double> LoadMinedMtimes()
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = "SELECT source_file, MAX(source_mtime) FROM drawers GROUP BY source_file;";
+        using var r = cmd.ExecuteReader();
+        var result = new Dictionary<string, double>(StringComparer.Ordinal);
+        while (r.Read())
+            result[r.GetString(0)] = r.GetDouble(1);
+        return result;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
