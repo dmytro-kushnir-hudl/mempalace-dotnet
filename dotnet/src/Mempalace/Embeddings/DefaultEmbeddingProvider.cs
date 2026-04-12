@@ -1,3 +1,5 @@
+using System.Buffers;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using Microsoft.Extensions.AI;
@@ -162,11 +164,18 @@ public sealed class DefaultEmbeddingProvider
 
     private float[][] EmbedBatch(ReadOnlyMemory<char>[] texts)
     {
-        int batch = texts.Length;
+        int batch   = texts.Length;
+        int flatLen = batch * MaxTokens;
 
-        var inputIds      = new long[batch * MaxTokens];
-        var attentionMask = new long[batch * MaxTokens];
-        // token_type_ids stays all-zero (sentence-A only; default for single sentences)
+        var inputIds      = ArrayPool<long>.Shared.Rent(flatLen);
+        var attentionMask = ArrayPool<long>.Shared.Rent(flatLen);
+        var tokenTypeIds  = ArrayPool<long>.Shared.Rent(flatLen);
+
+        // token_type_ids is always all-zero — one vectorised AVX sweep before the loop
+        Unsafe.InitBlockUnaligned(
+            ref Unsafe.As<long, byte>(ref tokenTypeIds[0]),
+            0,
+            (uint)(flatLen * sizeof(long)));
 
         for (int b = 0; b < batch; b++)
         {
@@ -213,26 +222,42 @@ public sealed class DefaultEmbeddingProvider
             if (cleanBuf is not null) System.Buffers.ArrayPool<char>.Shared.Return(cleanBuf);
             int len = ids.Count;
 
-            int baseIdx = b * MaxTokens;
+            int baseIdx  = b * MaxTokens;
+            int padStart = baseIdx + len;
+            int padLen   = MaxTokens - len;
+
             for (int t = 0; t < len; t++)
                 inputIds[baseIdx + t] = ids[t];
+            // Zero the padding slots — rented array is dirty
+            Unsafe.InitBlockUnaligned(
+                ref Unsafe.As<long, byte>(ref inputIds[padStart]),
+                0,
+                (uint)(padLen * sizeof(long)));
 
             for (int t = 0; t < len; t++)
                 attentionMask[baseIdx + t] = 1L;
-
-            // positions [len..MaxTokens) remain 0 (padding)
+            Unsafe.InitBlockUnaligned(
+                ref Unsafe.As<long, byte>(ref attentionMask[padStart]),
+                0,
+                (uint)(padLen * sizeof(long)));
         }
 
         int[] dims = [batch, MaxTokens];
 
         var inputs = new[]
         {
-            NamedOnnxValue.CreateFromTensor("input_ids", new DenseTensor<long>(inputIds, dims)),
-            NamedOnnxValue.CreateFromTensor("attention_mask", new DenseTensor<long>(attentionMask, dims)),
-            NamedOnnxValue.CreateFromTensor("token_type_ids", new DenseTensor<long>(new long[batch * MaxTokens], dims)),
+            NamedOnnxValue.CreateFromTensor("input_ids",
+                new DenseTensor<long>(inputIds.AsMemory(0, flatLen), dims)),
+            NamedOnnxValue.CreateFromTensor("attention_mask",
+                new DenseTensor<long>(attentionMask.AsMemory(0, flatLen), dims)),
+            NamedOnnxValue.CreateFromTensor("token_type_ids",
+                new DenseTensor<long>(tokenTypeIds.AsMemory(0, flatLen), dims)),
         };
 
         using var outputs = _session.Run(inputs);
+        ArrayPool<long>.Shared.Return(inputIds);
+        ArrayPool<long>.Shared.Return(attentionMask);
+        ArrayPool<long>.Shared.Return(tokenTypeIds);
         // last_hidden_state: [batch, MaxTokens, EmbeddingDim]
         var hidden = outputs[0].AsTensor<float>();
 
