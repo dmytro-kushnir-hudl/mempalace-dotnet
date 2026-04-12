@@ -6,23 +6,30 @@ namespace Mempalace.IntegrationTests.Tests;
 [Collection("MCP")]
 public sealed class T21_T30_DrawerTests(EmbedderFixture embedder) : IAsyncLifetime, IDisposable
 {
-    private readonly PalaceFactory _factory = new(embedder.Embedder);
-    private McpToolContext _sqliteCtx = null!;
-    private McpToolContext _chromaCtx = null!;
-
     private const string ExactContent =
         "We decided to use JWT tokens with RS256 signing because it allows stateless verification across microservices. The secret is stored in Vault.";
 
+    private readonly PalaceFactory _factory = new(embedder.Embedder);
+    private McpToolContext _chromaCtx = null!;
+    private McpToolContext _sqliteCtx = null!;
+
     public async ValueTask InitializeAsync()
     {
-        (_sqliteCtx, _) = _factory.CreateContext(VectorBackend.Sqlite);
+        (_sqliteCtx, _) = _factory.CreateContext();
         (_chromaCtx, _) = _factory.CreateContext(VectorBackend.Chroma);
         await Seed.ApplyAsync(_sqliteCtx);
         await Seed.ApplyAsync(_chromaCtx);
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-    public void Dispose() => _factory.Dispose();
+    public ValueTask DisposeAsync()
+    {
+        return ValueTask.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        _factory.Dispose();
+    }
 
     // ── Deduplication ──────────────────────────────────────────────────────────
 
@@ -32,7 +39,7 @@ public sealed class T21_T30_DrawerTests(EmbedderFixture embedder) : IAsyncLifeti
     public async Task T21_CheckDuplicate_ExactMatch_IsTrue(VectorBackend backend)
     {
         var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
-        var s   = await McpHarness.SessionAsync(ctx,
+        var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_check_duplicate",
                 new { content = ExactContent, threshold = 0.95 }));
 
@@ -47,7 +54,7 @@ public sealed class T21_T30_DrawerTests(EmbedderFixture embedder) : IAsyncLifeti
     public async Task T22_CheckDuplicate_LowThreshold_SimilarContentMatches(VectorBackend backend)
     {
         var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
-        var s   = await McpHarness.SessionAsync(ctx,
+        var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_check_duplicate",
                 new { content = "JWT token auth", threshold = 0.5 }));
 
@@ -60,7 +67,7 @@ public sealed class T21_T30_DrawerTests(EmbedderFixture embedder) : IAsyncLifeti
     public async Task T23_CheckDuplicate_UnrelatedContent_NotDuplicate(VectorBackend backend)
     {
         var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
-        var s   = await McpHarness.SessionAsync(ctx,
+        var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_check_duplicate",
                 new { content = "completely unrelated topic about baking bread", threshold = 0.99 }));
 
@@ -96,7 +103,7 @@ public sealed class T21_T30_DrawerTests(EmbedderFixture embedder) : IAsyncLifeti
             McpHarness.Call(3, "mempalace_search",
                 new { query = "regression test drawer" }));
 
-        var testId  = s.Result(2)["drawer_id"]!.GetValue<string>();
+        var testId = s.Result(2)["drawer_id"]!.GetValue<string>();
         var results = s.Result(3)["results"]!.AsArray();
         Assert.Contains(results, r => r!["text"]!.GetValue<string>().Contains("Regression test drawer"));
         _ = testId; // used implicitly via search content

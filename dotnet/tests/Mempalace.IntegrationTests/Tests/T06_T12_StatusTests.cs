@@ -7,25 +7,32 @@ namespace Mempalace.IntegrationTests.Tests;
 public sealed class T06_T12_StatusTests(EmbedderFixture embedder) : IAsyncLifetime, IDisposable
 {
     private readonly PalaceFactory _factory = new(embedder.Embedder);
-    private McpToolContext _sqliteCtx = null!;
     private McpToolContext _chromaCtx = null!;
+    private McpToolContext _sqliteCtx = null!;
 
     public async ValueTask InitializeAsync()
     {
-        (_sqliteCtx, _) = _factory.CreateContext(VectorBackend.Sqlite);
+        (_sqliteCtx, _) = _factory.CreateContext();
         (_chromaCtx, _) = _factory.CreateContext(VectorBackend.Chroma);
         await Seed.ApplyAsync(_sqliteCtx);
         await Seed.ApplyAsync(_chromaCtx);
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-    public void Dispose() => _factory.Dispose();
+    public ValueTask DisposeAsync()
+    {
+        return ValueTask.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        _factory.Dispose();
+    }
 
     [Fact]
     public async Task T06_Status_EmptyPalace_HasRequiredKeys()
     {
         var (ctx, _) = _factory.CreateContext();
-        var session  = await McpHarness.SessionAsync(ctx,
+        var session = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_status", new { }));
 
         var r = session.Result(2);
@@ -43,7 +50,7 @@ public sealed class T06_T12_StatusTests(EmbedderFixture embedder) : IAsyncLifeti
     public async Task T07_Status_AfterSeeding_Shows6Drawers(VectorBackend backend)
     {
         var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
-        var s   = await McpHarness.SessionAsync(ctx,
+        var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_status", new { }));
 
         var r = s.Result(2);
@@ -58,7 +65,7 @@ public sealed class T06_T12_StatusTests(EmbedderFixture embedder) : IAsyncLifeti
     public async Task T08_ListWings_BackendAndFrontend(VectorBackend backend)
     {
         var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
-        var s   = await McpHarness.SessionAsync(ctx,
+        var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_list_wings", new { }));
 
         var wings = s.Result(2)["wings"]!;
@@ -73,7 +80,7 @@ public sealed class T06_T12_StatusTests(EmbedderFixture embedder) : IAsyncLifeti
     public async Task T09_ListRooms_NoFilter_ShowsAllRooms(VectorBackend backend)
     {
         var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
-        var s   = await McpHarness.SessionAsync(ctx,
+        var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_list_rooms", new { }));
 
         var rooms = s.Result(2)["rooms"]!;
@@ -88,7 +95,7 @@ public sealed class T06_T12_StatusTests(EmbedderFixture embedder) : IAsyncLifeti
     public async Task T10_ListRooms_BackendWing_ExcludesComponents(VectorBackend backend)
     {
         var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
-        var s   = await McpHarness.SessionAsync(ctx,
+        var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_list_rooms", new { wing = "backend" }));
 
         var rooms = s.Result(2)["rooms"]!;
@@ -103,7 +110,7 @@ public sealed class T06_T12_StatusTests(EmbedderFixture embedder) : IAsyncLifeti
     public async Task T11_GetTaxonomy_CorrectCounts(VectorBackend backend)
     {
         var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
-        var s   = await McpHarness.SessionAsync(ctx,
+        var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_get_taxonomy", new { }));
 
         var tax = s.Result(2)["taxonomy"]!;

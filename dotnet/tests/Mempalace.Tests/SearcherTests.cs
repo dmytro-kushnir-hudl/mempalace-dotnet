@@ -6,8 +6,11 @@ public sealed class SearcherTests
 {
     // ── BuildFilter (replaces BuildWhere) ─────────────────────────────────────
 
-    [Fact] public void BuildFilter_BothNull_ReturnsNull() =>
+    [Fact]
+    public void BuildFilter_BothNull_ReturnsNull()
+    {
         Assert.Null(Searcher.BuildFilter(null, null));
+    }
 
     [Fact]
     public void BuildFilter_WingOnly_SingleClause()
@@ -33,7 +36,7 @@ public sealed class SearcherTests
         var f = Searcher.BuildFilter("tech", "backend");
         Assert.NotNull(f);
         Assert.Equal(2, f!.Clauses.Count);
-        Assert.Equal("tech",    f.Clauses["wing"]?.ToString());
+        Assert.Equal("tech", f.Clauses["wing"]?.ToString());
         Assert.Equal("backend", f.Clauses["room"]?.ToString());
     }
 
@@ -52,7 +55,7 @@ public sealed class SearcherTests
     {
         var f = MetadataFilter.Where("wing", "tech").And("room", "backend");
         Assert.Equal(2, f.Clauses.Count);
-        Assert.Equal("tech",    f.Clauses["wing"]);
+        Assert.Equal("tech", f.Clauses["wing"]);
         Assert.Equal("backend", f.Clauses["room"]);
     }
 

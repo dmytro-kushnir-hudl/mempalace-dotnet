@@ -12,10 +12,10 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Mempalace\Mempalace.csproj" />
+        <ProjectReference Include="..\Mempalace\Mempalace.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="System.CommandLine" Version="2.0.5" />
+        <PackageReference Include="System.CommandLine" Version="2.0.5"/>
     </ItemGroup>
 </Project>

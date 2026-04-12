@@ -15,7 +15,14 @@ namespace Mempalace;
 //   EMOTIONAL  — feelings, vulnerability, relationships
 // ---------------------------------------------------------------------------
 
-public enum MemoryType { Decision, Preference, Milestone, Problem, Emotional }
+public enum MemoryType
+{
+    Decision,
+    Preference,
+    Milestone,
+    Problem,
+    Emotional
+}
 
 public sealed record ExtractedMemory(string Content, MemoryType MemoryType, int ChunkIndex);
 
@@ -35,7 +42,7 @@ public static class GeneralExtractor
         @"\bover\b.*\bbecause\b", @"\barchitecture\b",
         @"\bapproach\b", @"\bstrategy\b", @"\bpattern\b",
         @"\bstack\b", @"\bframework\b", @"\binfrastructure\b",
-        @"\bset (it |this )?to\b", @"\bconfigure\b", @"\bdefault\b",
+        @"\bset (it |this )?to\b", @"\bconfigure\b", @"\bdefault\b"
     ];
 
     private static readonly string[] PreferenceMarkers =
@@ -48,7 +55,7 @@ public static class GeneralExtractor
         @"\bwe (always|never)\b", @"\bfunctional\b.*\bstyle\b",
         @"\bimperative\b", @"\bsnake_?case\b", @"\bcamel_?case\b",
         @"\btabs\b.*\bspaces\b", @"\bspaces\b.*\btabs\b",
-        @"\buse\b.*\binstead of\b",
+        @"\buse\b.*\binstead of\b"
     ];
 
     private static readonly string[] MilestoneMarkers =
@@ -66,7 +73,7 @@ public static class GeneralExtractor
         @"\bprototype\b", @"\bproof of concept\b", @"\bdemo\b",
         @"\bversion \d", @"\bv\d+\.\d+",
         @"\d+x (compression|faster|slower|better|improvement|reduction)",
-        @"\d+% (reduction|improvement|faster|better|smaller)",
+        @"\d+% (reduction|improvement|faster|better|smaller)"
     ];
 
     private static readonly string[] ProblemMarkers =
@@ -79,7 +86,7 @@ public static class GeneralExtractor
         @"\bthe fix (is|was)\b", @"\bworkaround\b", @"\bthat'?s why\b",
         @"\bthe reason it\b", @"\bfixed (it |the |by )\b",
         @"\bsolution (is|was)\b", @"\bresolved\b", @"\bpatched\b",
-        @"\bthe answer (is|was)\b", @"\b(had|need) to\b.*\binstead\b",
+        @"\bthe answer (is|was)\b", @"\b(had|need) to\b.*\binstead\b"
     ];
 
     private static readonly string[] EmotionMarkers =
@@ -90,17 +97,17 @@ public static class GeneralExtractor
         @"\bworried\b", @"\blonely\b", @"\bbeautiful\b", @"\bamazing\b",
         @"\bwonderful\b", @"i feel", @"i'm scared", @"i love you",
         @"i'm sorry", @"i can't", @"i wish", @"i miss", @"i need",
-        @"never told anyone", @"nobody knows", @"\*[^*]+\*",
+        @"never told anyone", @"nobody knows", @"\*[^*]+\*"
     ];
 
     private static readonly Dictionary<MemoryType, string[]> AllMarkers =
-        new Dictionary<MemoryType, string[]>
+        new()
         {
-            [MemoryType.Decision]   = DecisionMarkers,
+            [MemoryType.Decision] = DecisionMarkers,
             [MemoryType.Preference] = PreferenceMarkers,
-            [MemoryType.Milestone]  = MilestoneMarkers,
-            [MemoryType.Problem]    = ProblemMarkers,
-            [MemoryType.Emotional]  = EmotionMarkers,
+            [MemoryType.Milestone] = MilestoneMarkers,
+            [MemoryType.Problem] = ProblemMarkers,
+            [MemoryType.Emotional] = EmotionMarkers
         };
 
     // Compiled marker regex cache (per type)
@@ -113,20 +120,20 @@ public static class GeneralExtractor
 
     // ── Sentiment ─────────────────────────────────────────────────────────────
 
-    private static readonly HashSet<string> PositiveWords = new HashSet<string>
+    private static readonly HashSet<string> PositiveWords = new()
     {
-        "pride","proud","joy","happy","love","loving","beautiful","amazing","wonderful",
-        "incredible","fantastic","brilliant","perfect","excited","thrilled","grateful",
-        "warm","breakthrough","success","works","working","solved","fixed","nailed",
-        "heart","hug","precious","adore",
+        "pride", "proud", "joy", "happy", "love", "loving", "beautiful", "amazing", "wonderful",
+        "incredible", "fantastic", "brilliant", "perfect", "excited", "thrilled", "grateful",
+        "warm", "breakthrough", "success", "works", "working", "solved", "fixed", "nailed",
+        "heart", "hug", "precious", "adore"
     };
 
-    private static readonly HashSet<string> NegativeWords = new HashSet<string>
+    private static readonly HashSet<string> NegativeWords = new()
     {
-        "bug","error","crash","crashing","crashed","fail","failed","failing","failure",
-        "broken","broke","breaking","breaks","issue","problem","wrong","stuck","blocked",
-        "unable","impossible","missing","terrible","horrible","awful","worse","worst",
-        "panic","disaster","mess",
+        "bug", "error", "crash", "crashing", "crashed", "fail", "failed", "failing", "failure",
+        "broken", "broke", "breaking", "breaks", "issue", "problem", "wrong", "stuck", "blocked",
+        "unable", "impossible", "missing", "terrible", "horrible", "awful", "worse", "worst",
+        "panic", "disaster", "mess"
     };
 
     // ── Code line patterns ────────────────────────────────────────────────────
@@ -134,7 +141,9 @@ public static class GeneralExtractor
     private static readonly Regex[] CodeLinePatterns =
     [
         new(@"^\s*[\$#]\s", RegexOptions.Compiled),
-        new(@"^\s*(cd|source|echo|export|pip|npm|git|python|bash|curl|wget|mkdir|rm|cp|mv|ls|cat|grep|find|chmod|sudo|brew|docker)\s", RegexOptions.Compiled),
+        new(
+            @"^\s*(cd|source|echo|export|pip|npm|git|python|bash|curl|wget|mkdir|rm|cp|mv|ls|cat|grep|find|chmod|sudo|brew|docker)\s",
+            RegexOptions.Compiled),
         new(@"^\s*```", RegexOptions.Compiled),
         new(@"^\s*(import|from|def|class|function|const|let|var|return)\s", RegexOptions.Compiled),
         new(@"^\s*[A-Z_]{2,}=", RegexOptions.Compiled),
@@ -143,7 +152,7 @@ public static class GeneralExtractor
         new(@"^\s*[{}\[\]]\s*$", RegexOptions.Compiled),
         new(@"^\s*(if|for|while|try|except|elif|else:)\b", RegexOptions.Compiled),
         new(@"^\s*\w+\.\w+\(", RegexOptions.Compiled),
-        new(@"^\s*\w+ = \w+\.\w+", RegexOptions.Compiled),
+        new(@"^\s*\w+ = \w+\.\w+", RegexOptions.Compiled)
     ];
 
     // ── Resolution patterns ───────────────────────────────────────────────────
@@ -158,7 +167,7 @@ public static class GeneralExtractor
         new(@"\bit works\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
         new(@"\bnailed it\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
         new(@"\bfigured (it )?out\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
-        new(@"\bthe (fix|answer|solution)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new(@"\bthe (fix|answer|solution)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled)
     ];
 
     // ── Turn detection patterns ───────────────────────────────────────────────
@@ -167,14 +176,14 @@ public static class GeneralExtractor
     [
         new(@"^>\s", RegexOptions.Compiled),
         new(@"^(Human|User|Q)\s*:", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-        new(@"^(Assistant|AI|A|Claude|ChatGPT)\s*:", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+        new(@"^(Assistant|AI|A|Claude|ChatGPT)\s*:", RegexOptions.Compiled | RegexOptions.IgnoreCase)
     ];
 
     // ── Public API ────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Extract typed memories from any text. Pure heuristics, no LLM.
-    /// Returns decisions, preferences, milestones, problems, and emotional moments.
+    ///     Extract typed memories from any text. Pure heuristics, no LLM.
+    ///     Returns decisions, preferences, milestones, problems, and emotional moments.
     /// </summary>
     public static IReadOnlyList<ExtractedMemory> ExtractMemories(
         string text, double minConfidence = 0.3)
@@ -191,21 +200,21 @@ public static class GeneralExtractor
 
             foreach (var (type, regexes) in CompiledMarkers)
             {
-                double score = ScoreMarkers(prose, regexes);
+                var score = ScoreMarkers(prose, regexes);
                 if (score > 0) scores[type] = score;
             }
 
             if (scores.Count == 0) continue;
 
             // Length bonus
-            int lengthBonus = seg.Length > 500 ? 2 : seg.Length > 200 ? 1 : 0;
+            var lengthBonus = seg.Length > 500 ? 2 : seg.Length > 200 ? 1 : 0;
 
-            var bestType  = scores.MaxBy(kv => kv.Value).Key;
-            double maxScore = scores[bestType] + lengthBonus;
+            var bestType = scores.MaxBy(kv => kv.Value).Key;
+            var maxScore = scores[bestType] + lengthBonus;
 
-            bestType  = Disambiguate(bestType, prose, scores);
+            bestType = Disambiguate(bestType, prose, scores);
 
-            double confidence = Math.Min(1.0, maxScore / 5.0);
+            var confidence = Math.Min(1.0, maxScore / 5.0);
             if (confidence < minConfidence) continue;
 
             memories.Add(new ExtractedMemory(seg.Trim(), bestType, memories.Count));
@@ -228,13 +237,15 @@ public static class GeneralExtractor
     {
         var words = new HashSet<string>(
             Regex.Matches(text.ToLowerInvariant(), @"\b\w+\b").Select(m => m.Value));
-        int pos = words.Intersect(PositiveWords).Count();
-        int neg = words.Intersect(NegativeWords).Count();
+        var pos = words.Intersect(PositiveWords).Count();
+        var neg = words.Intersect(NegativeWords).Count();
         return pos > neg ? "positive" : neg > pos ? "negative" : "neutral";
     }
 
-    private static bool HasResolution(string text) =>
-        ResolutionPatterns.Any(rx => rx.IsMatch(text));
+    private static bool HasResolution(string text)
+    {
+        return ResolutionPatterns.Any(rx => rx.IsMatch(text));
+    }
 
     private static MemoryType Disambiguate(
         MemoryType type, string text, Dictionary<MemoryType, double> scores)
@@ -268,13 +279,18 @@ public static class GeneralExtractor
 
     private static string ExtractProse(string text)
     {
-        var lines   = text.Split('\n');
-        var prose   = new List<string>();
-        bool inCode = false;
+        var lines = text.Split('\n');
+        var prose = new List<string>();
+        var inCode = false;
 
         foreach (var line in lines)
         {
-            if (line.TrimStart().StartsWith("```", StringComparison.Ordinal)) { inCode = !inCode; continue; }
+            if (line.TrimStart().StartsWith("```", StringComparison.Ordinal))
+            {
+                inCode = !inCode;
+                continue;
+            }
+
             if (inCode) continue;
             if (!IsCodeLine(line)) prose.Add(line);
         }
@@ -286,7 +302,7 @@ public static class GeneralExtractor
     private static List<string> SplitIntoSegments(string text)
     {
         var lines = text.Split('\n');
-        int turnCount = lines.Count(l => TurnPatterns.Any(rx => rx.IsMatch(l.Trim())));
+        var turnCount = lines.Count(l => TurnPatterns.Any(rx => rx.IsMatch(l.Trim())));
 
         if (turnCount >= 3)
             return SplitByTurns(lines);
@@ -299,11 +315,12 @@ public static class GeneralExtractor
         if (paras.Count <= 1 && lines.Length > 20)
         {
             var groups = new List<string>();
-            for (int i = 0; i < lines.Length; i += 25)
+            for (var i = 0; i < lines.Length; i += 25)
             {
                 var group = string.Join('\n', lines.Skip(i).Take(25)).Trim();
                 if (group.Length > 0) groups.Add(group);
             }
+
             return groups;
         }
 
@@ -313,16 +330,17 @@ public static class GeneralExtractor
     private static List<string> SplitByTurns(string[] lines)
     {
         var segments = new List<string>();
-        var current  = new List<string>();
+        var current = new List<string>();
 
         foreach (var line in lines)
         {
-            bool isTurn = TurnPatterns.Any(rx => rx.IsMatch(line.Trim()));
+            var isTurn = TurnPatterns.Any(rx => rx.IsMatch(line.Trim()));
             if (isTurn && current.Count > 0)
             {
                 segments.Add(string.Join('\n', current));
                 current.Clear();
             }
+
             current.Add(line);
         }
 

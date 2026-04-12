@@ -1,6 +1,5 @@
-using Microsoft.Extensions.AI;
-using Chroma.Embeddings;
 using Mempalace.Storage;
+using Microsoft.Extensions.AI;
 
 namespace Mempalace;
 
@@ -45,8 +44,14 @@ public static class Searcher
         CancellationToken ct = default)
     {
         PalaceSession session;
-        try { session = PalaceSession.Open(palacePath, collectionName, backend); }
-        catch (Exception ex) { throw new SearchError($"No palace found at {palacePath}: {ex.Message}"); }
+        try
+        {
+            session = PalaceSession.Open(palacePath, collectionName, backend);
+        }
+        catch (Exception ex)
+        {
+            throw new SearchError($"No palace found at {palacePath}: {ex.Message}");
+        }
 
         using (session)
         {
@@ -64,12 +69,12 @@ public static class Searcher
             }
 
             var hits = raw.Select(r => new SearchResult(
-                Text:       r.Document ?? "",
-                Wing:       r.Metadata?.GetValueOrDefault("wing")        as string ?? "",
-                Room:       r.Metadata?.GetValueOrDefault("room")        as string ?? "",
-                SourceFile: Path.GetFileName(
+                r.Document ?? "",
+                r.Metadata?.GetValueOrDefault("wing") as string ?? "",
+                r.Metadata?.GetValueOrDefault("room") as string ?? "",
+                Path.GetFileName(
                     r.Metadata?.GetValueOrDefault("source_file") as string ?? ""),
-                Similarity: Math.Round(r.Similarity, 3))).ToList();
+                Math.Round(r.Similarity, 3))).ToList();
 
             return new SearchResponse(query, wing, room, hits);
         }

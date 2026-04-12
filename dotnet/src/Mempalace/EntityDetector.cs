@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Mempalace;
@@ -12,7 +13,12 @@ namespace Mempalace;
 // No LLM required. Pure regex signal scoring.
 // ---------------------------------------------------------------------------
 
-public enum EntityType { Person, Project, Uncertain }
+public enum EntityType
+{
+    Person,
+    Project,
+    Uncertain
+}
 
 public sealed record DetectedEntity(
     string Name,
@@ -38,12 +44,12 @@ public static class EntityDetector
         @"\b{0}\s+wants?\b", @"\b{0}\s+loves?\b", @"\b{0}\s+hates?\b",
         @"\b{0}\s+knows?\b", @"\b{0}\s+decided\b", @"\b{0}\s+pushed\b",
         @"\b{0}\s+wrote\b", @"\bhey\s+{0}\b", @"\bthanks?\s+{0}\b",
-        @"\bhi\s+{0}\b", @"\bdear\s+{0}\b",
+        @"\bhi\s+{0}\b", @"\bdear\s+{0}\b"
     ];
 
     private static readonly string[] DialogueTemplates =
     [
-        @"^>\s*{0}[:\s]", @"^{0}:\s", @"^\[{0}\]", @"""{0}\s+said",
+        @"^>\s*{0}[:\s]", @"^{0}:\s", @"^\[{0}\]", @"""{0}\s+said"
     ];
 
     private static readonly string[] ProjectVerbTemplates =
@@ -54,7 +60,7 @@ public static class EntityDetector
         @"\bthe\s+{0}\s+architecture\b", @"\bthe\s+{0}\s+pipeline\b",
         @"\bthe\s+{0}\s+system\b", @"\bthe\s+{0}\s+repo\b",
         @"\b{0}\s+v\d+\b", @"\b{0}\.py\b", @"\b{0}-core\b",
-        @"\b{0}-local\b", @"\bimport\s+{0}\b", @"\bpip\s+install\s+{0}\b",
+        @"\b{0}-local\b", @"\bimport\s+{0}\b", @"\bpip\s+install\s+{0}\b"
     ];
 
     private static readonly Regex[] PronounPatterns =
@@ -67,7 +73,7 @@ public static class EntityDetector
         new(@"\bhis\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
         new(@"\bthey\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
         new(@"\bthem\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
-        new(@"\btheir\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new(@"\btheir\b", RegexOptions.IgnoreCase | RegexOptions.Compiled)
     ];
 
     private static readonly Regex CandidateWord =
@@ -81,59 +87,60 @@ public static class EntityDetector
 
     // ── Stopwords ─────────────────────────────────────────────────────────────
 
-    private static readonly HashSet<string> Stopwords = new HashSet<string>(
+    private static readonly HashSet<string> Stopwords = new(
         StringComparer.OrdinalIgnoreCase)
     {
-        "the","a","an","and","or","but","in","on","at","to","for","of","with","by",
-        "from","as","is","was","are","were","be","been","being","have","has","had",
-        "do","does","did","will","would","could","should","may","might","must","shall",
-        "can","this","that","these","those","it","its","they","them","their","we","our",
-        "you","your","i","my","me","he","she","his","her","who","what","when","where",
-        "why","how","which","if","then","so","not","no","yes","ok","okay","just","very",
-        "really","also","already","still","even","only","here","there","now","too","up",
-        "out","about","like","use","get","got","make","made","take","put","come","go",
-        "see","know","think","true","false","none","null","new","old","all","any","some",
-        "return","print","def","class","import","from","step","usage","run","check",
-        "find","add","set","list","args","dict","str","int","bool","path","file","type",
-        "name","note","example","option","result","error","warning","info","every","each",
-        "more","less","next","last","first","second","stack","layer","mode","test","stop",
-        "start","copy","move","source","target","output","input","data","item","key",
-        "value","returns","raises","yields","self","cls","kwargs","world","well","want",
-        "topic","choose","social","cars","phones","healthcare","human","humans","people",
-        "things","something","nothing","everything","anything","someone","everyone",
-        "anyone","way","time","day","life","place","thing","part","kind","sort","case",
-        "point","idea","fact","sense","question","answer","reason","number","version",
-        "system","hey","hi","hello","thanks","thank","right","let","click","hit","press",
-        "tap","drag","drop","open","close","save","load","launch","install","download",
-        "upload","scroll","select","enter","submit","cancel","confirm","delete","paste",
-        "type","write","read","search","show","hide","desktop","documents","downloads",
-        "users","home","library","applications","preferences","settings","terminal",
-        "actor","vector","remote","control","duration","fetch","agents","tools","others",
-        "guards","ethics","regulation","learning","thinking","memory","language",
-        "intelligence","technology","society","culture","future","history","science",
-        "model","models","network","networks","training","inference",
+        "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by",
+        "from", "as", "is", "was", "are", "were", "be", "been", "being", "have", "has", "had",
+        "do", "does", "did", "will", "would", "could", "should", "may", "might", "must", "shall",
+        "can", "this", "that", "these", "those", "it", "its", "they", "them", "their", "we", "our",
+        "you", "your", "i", "my", "me", "he", "she", "his", "her", "who", "what", "when", "where",
+        "why", "how", "which", "if", "then", "so", "not", "no", "yes", "ok", "okay", "just", "very",
+        "really", "also", "already", "still", "even", "only", "here", "there", "now", "too", "up",
+        "out", "about", "like", "use", "get", "got", "make", "made", "take", "put", "come", "go",
+        "see", "know", "think", "true", "false", "none", "null", "new", "old", "all", "any", "some",
+        "return", "print", "def", "class", "import", "from", "step", "usage", "run", "check",
+        "find", "add", "set", "list", "args", "dict", "str", "int", "bool", "path", "file", "type",
+        "name", "note", "example", "option", "result", "error", "warning", "info", "every", "each",
+        "more", "less", "next", "last", "first", "second", "stack", "layer", "mode", "test", "stop",
+        "start", "copy", "move", "source", "target", "output", "input", "data", "item", "key",
+        "value", "returns", "raises", "yields", "self", "cls", "kwargs", "world", "well", "want",
+        "topic", "choose", "social", "cars", "phones", "healthcare", "human", "humans", "people",
+        "things", "something", "nothing", "everything", "anything", "someone", "everyone",
+        "anyone", "way", "time", "day", "life", "place", "thing", "part", "kind", "sort", "case",
+        "point", "idea", "fact", "sense", "question", "answer", "reason", "number", "version",
+        "system", "hey", "hi", "hello", "thanks", "thank", "right", "let", "click", "hit", "press",
+        "tap", "drag", "drop", "open", "close", "save", "load", "launch", "install", "download",
+        "upload", "scroll", "select", "enter", "submit", "cancel", "confirm", "delete", "paste",
+        "type", "write", "read", "search", "show", "hide", "desktop", "documents", "downloads",
+        "users", "home", "library", "applications", "preferences", "settings", "terminal",
+        "actor", "vector", "remote", "control", "duration", "fetch", "agents", "tools", "others",
+        "guards", "ethics", "regulation", "learning", "thinking", "memory", "language",
+        "intelligence", "technology", "society", "culture", "future", "history", "science",
+        "model", "models", "network", "networks", "training", "inference"
     };
 
     // ── Prose-only extensions (fewer false positives) ─────────────────────────
 
     private static readonly HashSet<string> ProseExtensions =
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        { ".txt", ".md", ".rst", ".csv" };
+        new(StringComparer.OrdinalIgnoreCase)
+            { ".txt", ".md", ".rst", ".csv" };
 
     // ── Public API ────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Detect entity candidates from a list of file paths.
-    /// Reads up to maxFiles files, first 5 KB each.
+    ///     Detect entity candidates from a list of file paths.
+    ///     Reads up to maxFiles files, first 5 KB each.
     /// </summary>
+    /// <remarks>TODO: call from <c>init</c> command during entity onboarding (see EntityRegistry.cs).</remarks>
     public static DetectedEntities DetectFromFiles(
         IEnumerable<string> filePaths, int maxFiles = 10)
     {
         const int MaxBytesPerFile = 5_000;
 
-        var allText  = new List<string>();
+        var allText = new List<string>();
         var allLines = new List<string>();
-        int read     = 0;
+        var read = 0;
 
         foreach (var path in filePaths)
         {
@@ -142,13 +149,16 @@ public static class EntityDetector
             {
                 using var fs = File.OpenRead(path);
                 var buf = new byte[MaxBytesPerFile];
-                int n   = fs.Read(buf, 0, MaxBytesPerFile);
-                var content = System.Text.Encoding.UTF8.GetString(buf, 0, n);
+                var n = fs.Read(buf, 0, MaxBytesPerFile);
+                var content = Encoding.UTF8.GetString(buf, 0, n);
                 allText.Add(content);
                 allLines.AddRange(content.Split('\n'));
                 read++;
             }
-            catch { /* skip unreadable */ }
+            catch
+            {
+                /* skip unreadable */
+            }
         }
 
         return DetectFromText(string.Join('\n', allText), allLines);
@@ -163,8 +173,8 @@ public static class EntityDetector
         if (candidates.Count == 0)
             return new DetectedEntities([], [], []);
 
-        var people    = new List<DetectedEntity>();
-        var projects  = new List<DetectedEntity>();
+        var people = new List<DetectedEntity>();
+        var projects = new List<DetectedEntity>();
         var uncertain = new List<DetectedEntity>();
 
         foreach (var (name, freq) in candidates.OrderByDescending(kv => kv.Value))
@@ -173,9 +183,9 @@ public static class EntityDetector
             var entity = ClassifyEntity(name, freq, scores);
             switch (entity.Type)
             {
-                case EntityType.Person:    people.Add(entity);    break;
-                case EntityType.Project:   projects.Add(entity);  break;
-                default:                   uncertain.Add(entity);  break;
+                case EntityType.Person: people.Add(entity); break;
+                case EntityType.Project: projects.Add(entity); break;
+                default: uncertain.Add(entity); break;
             }
         }
 
@@ -186,14 +196,15 @@ public static class EntityDetector
     }
 
     /// <summary>
-    /// Collect prose-preferring file list from a directory for entity detection.
-    /// Falls back to all readable files if fewer than 3 prose files found.
+    ///     Collect prose-preferring file list from a directory for entity detection.
+    ///     Falls back to all readable files if fewer than 3 prose files found.
     /// </summary>
+    /// <remarks>TODO: call from <c>init</c> command during entity onboarding (see EntityRegistry.cs).</remarks>
     public static IReadOnlyList<string> CollectFilesForDetection(
         string directory, int maxFiles = 10)
     {
         var prose = new List<string>();
-        var all   = new List<string>();
+        var all = new List<string>();
 
         foreach (var file in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories))
         {
@@ -242,7 +253,7 @@ public static class EntityDetector
     {
         var n = Regex.Escape(name);
         int ps = 0, prs = 0;
-        var psig  = new List<string>();
+        var psig = new List<string>();
         var prsig = new List<string>();
 
         // Dialogue markers (strong — 3x each)
@@ -250,16 +261,24 @@ public static class EntityDetector
         {
             var rx = new Regex(string.Format(CultureInfo.InvariantCulture, tpl, n),
                 RegexOptions.Multiline | RegexOptions.IgnoreCase);
-            int m = rx.Count(text);
-            if (m > 0) { ps += m * 3; psig.Add($"dialogue marker ({m}x)"); }
+            var m = rx.Count(text);
+            if (m > 0)
+            {
+                ps += m * 3;
+                psig.Add($"dialogue marker ({m}x)");
+            }
         }
 
         // Person verb patterns (2x each)
         foreach (var tpl in PersonVerbTemplates)
         {
             var rx = new Regex(string.Format(CultureInfo.InvariantCulture, tpl, n), RegexOptions.IgnoreCase);
-            int m = rx.Count(text);
-            if (m > 0) { ps += m * 2; psig.Add($"'{name} …' action ({m}x)"); }
+            var m = rx.Count(text);
+            if (m > 0)
+            {
+                ps += m * 2;
+                psig.Add($"'{name} …' action ({m}x)");
+            }
         }
 
         // Pronoun proximity (2x each hit)
@@ -270,7 +289,7 @@ public static class EntityDetector
             .Select(t => t.i)
             .ToList();
 
-        int pronounHits = 0;
+        var pronounHits = 0;
         foreach (var idx in nameLines)
         {
             var window = string.Join(' ', lines
@@ -278,32 +297,53 @@ public static class EntityDetector
                 .Take(5)).ToLowerInvariant();
             if (PronounPatterns.Any(rx => rx.IsMatch(window))) pronounHits++;
         }
-        if (pronounHits > 0) { ps += pronounHits * 2; psig.Add($"pronoun nearby ({pronounHits}x)"); }
+
+        if (pronounHits > 0)
+        {
+            ps += pronounHits * 2;
+            psig.Add($"pronoun nearby ({pronounHits}x)");
+        }
 
         // Direct address (4x each)
         var directRx = new Regex(
             $@"\bhey\s+{n}\b|\bthanks?\s+{n}\b|\bhi\s+{n}\b", RegexOptions.IgnoreCase);
-        int direct = directRx.Count(text);
-        if (direct > 0) { ps += direct * 4; psig.Add($"addressed directly ({direct}x)"); }
+        var direct = directRx.Count(text);
+        if (direct > 0)
+        {
+            ps += direct * 4;
+            psig.Add($"addressed directly ({direct}x)");
+        }
 
         // Project verb patterns (2x each)
         foreach (var tpl in ProjectVerbTemplates)
         {
             var rx = new Regex(string.Format(CultureInfo.InvariantCulture, tpl, n), RegexOptions.IgnoreCase);
-            int m = rx.Count(text);
-            if (m > 0) { prs += m * 2; prsig.Add($"project verb ({m}x)"); }
+            var m = rx.Count(text);
+            if (m > 0)
+            {
+                prs += m * 2;
+                prsig.Add($"project verb ({m}x)");
+            }
         }
 
         // Versioned/hyphenated (3x)
         var versionedRx = new Regex($@"\b{n}[-v]\w+", RegexOptions.IgnoreCase);
-        int versioned = versionedRx.Count(text);
-        if (versioned > 0) { prs += versioned * 3; prsig.Add($"versioned ({versioned}x)"); }
+        var versioned = versionedRx.Count(text);
+        if (versioned > 0)
+        {
+            prs += versioned * 3;
+            prsig.Add($"versioned ({versioned}x)");
+        }
 
         // Code file reference (3x)
         var codeRefRx = new Regex(
             $@"\b{n}\.(py|js|ts|yaml|yml|json|sh)\b", RegexOptions.IgnoreCase);
-        int codeRef = codeRefRx.Count(text);
-        if (codeRef > 0) { prs += codeRef * 3; prsig.Add($"code file ref ({codeRef}x)"); }
+        var codeRef = codeRefRx.Count(text);
+        if (codeRef > 0)
+        {
+            prs += codeRef * 3;
+            prsig.Add($"code file ref ({codeRef}x)");
+        }
 
         return (ps, prs, psig, prsig);
     }
@@ -312,29 +352,25 @@ public static class EntityDetector
         string name, int frequency,
         (int PersonScore, int ProjectScore, List<string> PersonSignals, List<string> ProjectSignals) s)
     {
-        int ps  = s.PersonScore;
-        int prs = s.ProjectScore;
-        int total = ps + prs;
+        var ps = s.PersonScore;
+        var prs = s.ProjectScore;
+        var total = ps + prs;
 
         if (total == 0)
-        {
             return new DetectedEntity(name, EntityType.Uncertain,
                 Math.Min(0.4, frequency / 50.0), frequency,
                 [$"appears {frequency}x, no strong type signals"]);
-        }
 
-        double personRatio = (double)ps / total;
+        var personRatio = (double)ps / total;
 
         // Require two distinct signal categories to confidently classify as person
         var sigCategories = new HashSet<string>();
         foreach (var sig in s.PersonSignals)
-        {
             if (sig.Contains("dialogue")) sigCategories.Add("dialogue");
             else if (sig.Contains("action")) sigCategories.Add("action");
             else if (sig.Contains("pronoun")) sigCategories.Add("pronoun");
             else if (sig.Contains("addressed")) sigCategories.Add("addressed");
-        }
-        bool hasTwoTypes = sigCategories.Count >= 2;
+        var hasTwoTypes = sigCategories.Count >= 2;
 
         if (personRatio >= 0.7 && hasTwoTypes && ps >= 5)
             return new DetectedEntity(name, EntityType.Person,

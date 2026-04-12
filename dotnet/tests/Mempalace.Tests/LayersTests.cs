@@ -21,7 +21,10 @@ public sealed class LayersTests
             var l0 = new Layer0(path);
             Assert.Equal("I am an AI assistant.", l0.Render());
         }
-        finally { File.Delete(path); }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [Fact]
@@ -32,12 +35,15 @@ public sealed class LayersTests
         {
             File.WriteAllText(path, "identity");
             var l0 = new Layer0(path);
-            var first  = l0.Render();
-            File.WriteAllText(path, "changed");   // file changes after first load
+            var first = l0.Render();
+            File.WriteAllText(path, "changed"); // file changes after first load
             var second = l0.Render();
-            Assert.Equal(first, second);           // cache wins
+            Assert.Equal(first, second); // cache wins
         }
-        finally { File.Delete(path); }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [Fact]
@@ -50,7 +56,10 @@ public sealed class LayersTests
             var l0 = new Layer0(path);
             Assert.Equal(100, l0.TokenEstimate());
         }
-        finally { File.Delete(path); }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     // ── Layer1 — requires no palace (empty palace returns empty) ─────────────
@@ -65,7 +74,10 @@ public sealed class LayersTests
             var l1 = new Layer1(path);
             Assert.Equal("", l1.Generate());
         }
-        finally { Directory.Delete(path, recursive: true); }
+        finally
+        {
+            Directory.Delete(path, true);
+        }
     }
 
     // ── Layer2 — no palace ────────────────────────────────────────────────────
@@ -74,7 +86,7 @@ public sealed class LayersTests
     public void Layer2_NonExistentPalace_ReturnsEmpty()
     {
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        var l2   = new Layer2(path);
+        var l2 = new Layer2(path);
         Assert.Equal("", l2.Retrieve());
     }
 
@@ -89,14 +101,14 @@ public sealed class LayersTests
         try
         {
             File.WriteAllText(idPath, "I am an assistant.");
-            var stack  = new MemoryStack(dbPath, idPath);
+            var stack = new MemoryStack(dbPath, idPath);
             var output = stack.WakeUp();
             Assert.Contains("I am an assistant.", output);
         }
         finally
         {
             File.Delete(idPath);
-            Directory.Delete(dbPath, recursive: true);
+            Directory.Delete(dbPath, true);
         }
     }
 

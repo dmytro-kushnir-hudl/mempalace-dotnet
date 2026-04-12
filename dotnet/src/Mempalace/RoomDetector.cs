@@ -23,62 +23,62 @@ public static class RoomDetector
     // ── Folder → room mapping (80+ patterns) ─────────────────────────────────
 
     private static readonly Dictionary<string, string> FolderRoomMap =
-        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        new(StringComparer.OrdinalIgnoreCase)
         {
-            ["frontend"]      = "frontend",  ["front-end"]    = "frontend",
-            ["front_end"]     = "frontend",  ["client"]       = "frontend",
-            ["ui"]            = "frontend",  ["views"]        = "frontend",
-            ["components"]    = "frontend",  ["pages"]        = "frontend",
-            ["backend"]       = "backend",   ["back-end"]     = "backend",
-            ["back_end"]      = "backend",   ["server"]       = "backend",
-            ["api"]           = "backend",   ["routes"]       = "backend",
-            ["services"]      = "backend",   ["controllers"]  = "backend",
-            ["models"]        = "backend",   ["database"]     = "backend",
-            ["db"]            = "backend",
-            ["docs"]          = "documentation", ["doc"]      = "documentation",
-            ["documentation"] = "documentation", ["wiki"]     = "documentation",
-            ["readme"]        = "documentation", ["notes"]    = "documentation",
-            ["design"]        = "design",    ["designs"]      = "design",
-            ["mockups"]       = "design",    ["wireframes"]   = "design",
-            ["assets"]        = "design",    ["storyboard"]   = "design",
-            ["costs"]         = "costs",     ["cost"]         = "costs",
-            ["budget"]        = "costs",     ["finance"]      = "costs",
-            ["financial"]     = "costs",     ["pricing"]      = "costs",
-            ["invoices"]      = "costs",     ["accounting"]   = "costs",
-            ["meetings"]      = "meetings",  ["meeting"]      = "meetings",
-            ["calls"]         = "meetings",  ["meeting_notes"]= "meetings",
-            ["standup"]       = "meetings",  ["minutes"]      = "meetings",
-            ["team"]          = "team",      ["staff"]        = "team",
-            ["hr"]            = "team",      ["hiring"]       = "team",
-            ["employees"]     = "team",      ["people"]       = "team",
-            ["research"]      = "research",  ["references"]   = "research",
-            ["reading"]       = "research",  ["papers"]       = "research",
-            ["planning"]      = "planning",  ["roadmap"]      = "planning",
-            ["strategy"]      = "planning",  ["specs"]        = "planning",
-            ["requirements"]  = "planning",
-            ["tests"]         = "testing",   ["test"]         = "testing",
-            ["testing"]       = "testing",   ["qa"]           = "testing",
-            ["scripts"]       = "scripts",   ["tools"]        = "scripts",
-            ["utils"]         = "scripts",
-            ["config"]        = "configuration",  ["configs"]  = "configuration",
-            ["settings"]      = "configuration",  ["infrastructure"] = "configuration",
-            ["infra"]         = "configuration",  ["deploy"]   = "configuration",
+            ["frontend"] = "frontend", ["front-end"] = "frontend",
+            ["front_end"] = "frontend", ["client"] = "frontend",
+            ["ui"] = "frontend", ["views"] = "frontend",
+            ["components"] = "frontend", ["pages"] = "frontend",
+            ["backend"] = "backend", ["back-end"] = "backend",
+            ["back_end"] = "backend", ["server"] = "backend",
+            ["api"] = "backend", ["routes"] = "backend",
+            ["services"] = "backend", ["controllers"] = "backend",
+            ["models"] = "backend", ["database"] = "backend",
+            ["db"] = "backend",
+            ["docs"] = "documentation", ["doc"] = "documentation",
+            ["documentation"] = "documentation", ["wiki"] = "documentation",
+            ["readme"] = "documentation", ["notes"] = "documentation",
+            ["design"] = "design", ["designs"] = "design",
+            ["mockups"] = "design", ["wireframes"] = "design",
+            ["assets"] = "design", ["storyboard"] = "design",
+            ["costs"] = "costs", ["cost"] = "costs",
+            ["budget"] = "costs", ["finance"] = "costs",
+            ["financial"] = "costs", ["pricing"] = "costs",
+            ["invoices"] = "costs", ["accounting"] = "costs",
+            ["meetings"] = "meetings", ["meeting"] = "meetings",
+            ["calls"] = "meetings", ["meeting_notes"] = "meetings",
+            ["standup"] = "meetings", ["minutes"] = "meetings",
+            ["team"] = "team", ["staff"] = "team",
+            ["hr"] = "team", ["hiring"] = "team",
+            ["employees"] = "team", ["people"] = "team",
+            ["research"] = "research", ["references"] = "research",
+            ["reading"] = "research", ["papers"] = "research",
+            ["planning"] = "planning", ["roadmap"] = "planning",
+            ["strategy"] = "planning", ["specs"] = "planning",
+            ["requirements"] = "planning",
+            ["tests"] = "testing", ["test"] = "testing",
+            ["testing"] = "testing", ["qa"] = "testing",
+            ["scripts"] = "scripts", ["tools"] = "scripts",
+            ["utils"] = "scripts",
+            ["config"] = "configuration", ["configs"] = "configuration",
+            ["settings"] = "configuration", ["infrastructure"] = "configuration",
+            ["infra"] = "configuration", ["deploy"] = "configuration"
         };
 
     // ── Main entry ────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Detect rooms from folder structure, falling back to filename patterns.
-    /// Writes mempalace.yaml to projectDir.
-    /// Returns detected rooms.
+    ///     Detect rooms from folder structure, falling back to filename patterns.
+    ///     Writes mempalace.yaml to projectDir.
+    ///     Returns detected rooms.
     /// </summary>
     public static IReadOnlyList<DetectedRoom> DetectAndSave(
         string projectDir, string? wingOverride = null)
     {
-        var dir         = Path.GetFullPath(projectDir);
+        var dir = Path.GetFullPath(projectDir);
         var projectName = wingOverride
-            ?? Path.GetFileName(dir).ToLowerInvariant()
-                    .Replace(' ', '_').Replace('-', '_');
+                          ?? Path.GetFileName(dir).ToLowerInvariant()
+                              .Replace(' ', '_').Replace('-', '_');
 
         var rooms = DetectRoomsFromFolders(dir);
         if (rooms.Count <= 1)
@@ -98,8 +98,14 @@ public static class RoomDetector
 
         IEnumerable<string> SafeDirs(string dir)
         {
-            try { return Directory.EnumerateDirectories(dir); }
-            catch { return []; }
+            try
+            {
+                return Directory.EnumerateDirectories(dir);
+            }
+            catch
+            {
+                return [];
+            }
         }
 
         // Top-level dirs
@@ -164,10 +170,13 @@ public static class RoomDetector
                 new EnumerationOptions
                 {
                     RecurseSubdirectories = true,
-                    IgnoreInaccessible    = true,
+                    IgnoreInaccessible = true
                 });
         }
-        catch { return [new DetectedRoom("general", "All project files", [])]; }
+        catch
+        {
+            return [new DetectedRoom("general", "All project files", [])];
+        }
 
         foreach (var file in files)
         {
@@ -175,7 +184,7 @@ public static class RoomDetector
             if (Constants.SkipDirs.Contains(dirName)) continue;
 
             var nameLower = Path.GetFileName(file).ToLowerInvariant()
-                                .Replace('-', '_').Replace(' ', '_');
+                .Replace('-', '_').Replace(' ', '_');
             foreach (var (kw, room) in FolderRoomMap)
                 if (nameLower.Contains(kw))
                     counts[room] = counts.GetValueOrDefault(room) + 1;
@@ -186,7 +195,7 @@ public static class RoomDetector
             .OrderByDescending(kv => kv.Value)
             .Take(6)
             .Select(kv => new DetectedRoom(kv.Key, $"Files related to {kv.Key}", [kv.Key]))
-            .ToList<DetectedRoom>();
+            .ToList();
 
         if (rooms.Count == 0)
             rooms.Add(new DetectedRoom("general", "All project files", []));
@@ -201,15 +210,15 @@ public static class RoomDetector
     {
         var data = new Dictionary<string, object>
         {
-            ["wing"]  = wing,
+            ["wing"] = wing,
             ["rooms"] = rooms.Select(r => new Dictionary<string, object>
             {
-                ["name"]        = r.Name,
+                ["name"] = r.Name,
                 ["description"] = r.Description,
-                ["keywords"]    = r.Keywords.Count > 0
+                ["keywords"] = r.Keywords.Count > 0
                     ? (object)r.Keywords
-                    : new List<string> { r.Name },
-            }).ToList(),
+                    : new List<string> { r.Name }
+            }).ToList()
         };
 
         var serializer = new SerializerBuilder()
@@ -217,7 +226,7 @@ public static class RoomDetector
             .DisableAliases()
             .Build();
 
-        var yaml    = serializer.Serialize(data);
+        var yaml = serializer.Serialize(data);
         var cfgPath = Path.Combine(projectDir, "mempalace.yaml");
         File.WriteAllText(cfgPath, yaml);
     }

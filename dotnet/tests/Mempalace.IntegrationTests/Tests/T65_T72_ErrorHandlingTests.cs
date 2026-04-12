@@ -8,6 +8,11 @@ public sealed class T65_T72_ErrorHandlingTests(EmbedderFixture embedder) : IDisp
 {
     private readonly PalaceFactory _factory = new(embedder.Embedder);
 
+    public void Dispose()
+    {
+        _factory.Dispose();
+    }
+
     [Theory]
     [InlineData(VectorBackend.Sqlite)]
     [InlineData(VectorBackend.Chroma)]
@@ -133,6 +138,4 @@ public sealed class T65_T72_ErrorHandlingTests(EmbedderFixture embedder) : IDisp
         var results = sB.Result(2)["results"]!.AsArray();
         Assert.Contains(results, r => r!["text"]!.GetValue<string>().Contains(unique));
     }
-
-    public void Dispose() => _factory.Dispose();
 }

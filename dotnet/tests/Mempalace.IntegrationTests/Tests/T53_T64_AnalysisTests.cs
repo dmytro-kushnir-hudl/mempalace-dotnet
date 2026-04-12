@@ -8,6 +8,11 @@ public sealed class T53_T64_AnalysisTests(EmbedderFixture embedder) : IDisposabl
 {
     private readonly PalaceFactory _factory = new(embedder.Embedder);
 
+    public void Dispose()
+    {
+        _factory.Dispose();
+    }
+
     private Task<McpSession> Run(string tool, object args)
     {
         var (ctx, _) = _factory.CreateContext();
@@ -19,8 +24,8 @@ public sealed class T53_T64_AnalysisTests(EmbedderFixture embedder) : IDisposabl
     {
         var s = await Run("mempalace_extract_memories", new
         {
-            text           = "We decided to use PostgreSQL instead of MySQL because of better JSON support.",
-            min_confidence = 0.1,
+            text = "We decided to use PostgreSQL instead of MySQL because of better JSON support.",
+            min_confidence = 0.1
         });
         var r = s.Result(2);
         Assert.True(r["total"]!.GetValue<int>() >= 1);
@@ -32,7 +37,7 @@ public sealed class T53_T64_AnalysisTests(EmbedderFixture embedder) : IDisposabl
     {
         var s = await Run("mempalace_extract_memories", new
         {
-            text = "Milestone: deployed auth v2 to production. The team hit this key goal in June.",
+            text = "Milestone: deployed auth v2 to production. The team hit this key goal in June."
         });
         Assert.True(s.Result(2)["by_type"]!["milestone"]?.GetValue<int>() >= 1);
     }
@@ -42,7 +47,7 @@ public sealed class T53_T64_AnalysisTests(EmbedderFixture embedder) : IDisposabl
     {
         var s = await Run("mempalace_extract_memories", new
         {
-            text = "Critical bug: auth middleware does not validate token expiry. This causes session hijacking.",
+            text = "Critical bug: auth middleware does not validate token expiry. This causes session hijacking."
         });
         Assert.True(s.Result(2)["by_type"]!["problem"]?.GetValue<int>() >= 1);
     }
@@ -52,7 +57,7 @@ public sealed class T53_T64_AnalysisTests(EmbedderFixture embedder) : IDisposabl
     {
         var s = await Run("mempalace_extract_memories", new
         {
-            text = "I prefer functional components over class components. The team always uses hooks now.",
+            text = "I prefer functional components over class components. The team always uses hooks now."
         });
         Assert.True(s.Result(2)["by_type"]!["preference"]?.GetValue<int>() >= 1);
     }
@@ -71,7 +76,7 @@ public sealed class T53_T64_AnalysisTests(EmbedderFixture embedder) : IDisposabl
     {
         var s = await Run("mempalace_extract_memories", new
         {
-            text = "We decided something.", min_confidence = 0.99,
+            text = "We decided something.", min_confidence = 0.99
         });
         Assert.True(s.Result(2)["total"]!.GetValue<int>() == 0);
     }
@@ -81,13 +86,14 @@ public sealed class T53_T64_AnalysisTests(EmbedderFixture embedder) : IDisposabl
     {
         var s = await Run("mempalace_detect_entities", new
         {
-            text = "Riley said the project is going well. Riley told Sam about the progress. Sam laughed. Riley and Sam both agreed.",
+            text =
+                "Riley said the project is going well. Riley told Sam about the progress. Sam laughed. Riley and Sam both agreed."
         });
         var r = s.Result(2);
-        var people    = r["people"]!.AsArray().Select(e => e!["Name"]!.GetValue<string>()).ToHashSet();
+        var people = r["people"]!.AsArray().Select(e => e!["Name"]!.GetValue<string>()).ToHashSet();
         var uncertain = r["uncertain"]!.AsArray().Select(e => e!["Name"]!.GetValue<string>()).ToHashSet();
         Assert.True(people.Contains("Riley") || uncertain.Contains("Riley") ||
-                    people.Contains("Sam")   || uncertain.Contains("Sam"));
+                    people.Contains("Sam") || uncertain.Contains("Sam"));
     }
 
     [Fact]
@@ -95,7 +101,7 @@ public sealed class T53_T64_AnalysisTests(EmbedderFixture embedder) : IDisposabl
     {
         var s = await Run("mempalace_detect_entities", new
         {
-            text = "We are building MemPalace. We deployed MemPalace v2. The MemPalace pipeline is stable.",
+            text = "We are building MemPalace. We deployed MemPalace v2. The MemPalace pipeline is stable."
         });
         var projects = s.Result(2)["projects"]!.AsArray()
             .Select(e => e!["Name"]!.GetValue<string>()).ToHashSet();
@@ -107,10 +113,10 @@ public sealed class T53_T64_AnalysisTests(EmbedderFixture embedder) : IDisposabl
     {
         var s = await Run("mempalace_detect_entities", new
         {
-            text = "Riley went to the store.",
+            text = "Riley went to the store."
         });
-        var r         = s.Result(2);
-        var people    = r["people"]!.AsArray().Select(e => e!["Name"]!.GetValue<string>()).ToHashSet();
+        var r = s.Result(2);
+        var people = r["people"]!.AsArray().Select(e => e!["Name"]!.GetValue<string>()).ToHashSet();
         var uncertain = r["uncertain"]!.AsArray().Select(e => e!["Name"]!.GetValue<string>()).ToHashSet();
         Assert.False(people.Contains("Riley") || uncertain.Contains("Riley"));
     }
@@ -121,9 +127,10 @@ public sealed class T53_T64_AnalysisTests(EmbedderFixture embedder) : IDisposabl
         var (ctx, _) = _factory.CreateContext();
         var session = await McpHarness.SessionAsync(ctx, McpHarness.Call(2, "mempalace_compress", new
         {
-            text = "We decided to migrate from MySQL to PostgreSQL because JSON support is far superior. This is a core architectural decision.",
+            text =
+                "We decided to migrate from MySQL to PostgreSQL because JSON support is far superior. This is a core architectural decision."
         }));
-        var r          = session.Result(2);
+        var r = session.Result(2);
         var compressed = r["compressed"]!.GetValue<string>();
 
         Assert.False(string.IsNullOrEmpty(compressed));
@@ -142,7 +149,8 @@ public sealed class T53_T64_AnalysisTests(EmbedderFixture embedder) : IDisposabl
     {
         var s = await Run("mempalace_compress", new
         {
-            text = "We decided to migrate from MySQL to PostgreSQL because JSON support is far superior. This is a core architectural decision.",
+            text =
+                "We decided to migrate from MySQL to PostgreSQL because JSON support is far superior. This is a core architectural decision."
         });
         var compressed = s.Result(2)["compressed"]!.GetValue<string>();
         Assert.Contains('"', compressed);
@@ -154,6 +162,4 @@ public sealed class T53_T64_AnalysisTests(EmbedderFixture embedder) : IDisposabl
         var s = await Run("mempalace_compress", new { text = "ok" });
         Assert.False(string.IsNullOrEmpty(s.Result(2)["compressed"]?.GetValue<string>()));
     }
-
-    public void Dispose() => _factory.Dispose();
 }

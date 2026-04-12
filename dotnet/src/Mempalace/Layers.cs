@@ -1,7 +1,6 @@
-using Microsoft.Extensions.AI;
 using System.Text;
-using Chroma.Embeddings;
 using Mempalace.Storage;
+using Microsoft.Extensions.AI;
 
 namespace Mempalace;
 
@@ -9,13 +8,10 @@ namespace Mempalace;
 // Layer 0 — Identity (~100 tokens, always loaded)
 // ---------------------------------------------------------------------------
 
-public sealed class Layer0
+public sealed class Layer0(string? identityPath = null)
 {
-    private readonly string _identityPath;
+    private readonly string _identityPath = identityPath ?? Constants.DefaultIdentityPath;
     private string? _cached;
-
-    public Layer0(string? identityPath = null)
-        => _identityPath = identityPath ?? Constants.DefaultIdentityPath;
 
     public string Render()
     {
@@ -26,50 +22,44 @@ public sealed class Layer0
         return _cached;
     }
 
-    public int TokenEstimate() => Render().Length / 4;
+    public int TokenEstimate()
+    {
+        return Render().Length / 4;
+    }
 }
 
 // ---------------------------------------------------------------------------
 // Layer 1 — Essential story (~500-800 tokens, auto-generated from palace)
 // ---------------------------------------------------------------------------
 
-public sealed class Layer1
+public sealed class Layer1(string? palacePath = null, string? wing = null, VectorBackend backend = VectorBackend.Chroma)
 {
     private const int MaxDrawers = 15;
-    private const int MaxChars   = 3_200;
-    private const int BatchSize  = 500;
+    private const int MaxChars = 3_200;
+    private const int BatchSize = 500;
 
-    private readonly string  _palacePath;
-    private readonly string? _wing;
-
-    private readonly VectorBackend _backend;
-
-    public Layer1(string? palacePath = null, string? wing = null, VectorBackend backend = VectorBackend.Chroma)
-    {
-        _palacePath = palacePath ?? Constants.DefaultPalacePath;
-        _wing       = wing;
-        _backend    = backend;
-    }
+    private readonly string _palacePath = palacePath ?? Constants.DefaultPalacePath;
 
     public string Generate()
     {
         if (!Directory.Exists(_palacePath)) return "";
 
-        using var session = PalaceSession.Open(_palacePath, backend: _backend);
+        using var session = PalaceSession.Open(_palacePath, backend: backend);
         var col = session.Collection;
 
-        var docs  = new List<string>();
+        var docs = new List<string>();
         var metas = new List<Dictionary<string, object?>>();
-        int offset = 0;
+        var offset = 0;
 
         while (true)
         {
-            var filter = _wing is not null
-                ? MetadataFilter.Where("wing", _wing) : null;
+            var filter = wing is not null
+                ? MetadataFilter.Where("wing", wing)
+                : null;
 
             var batch = col.Get(
-                filter: filter,
-                limit:  BatchSize,
+                filter,
+                limit: BatchSize,
                 offset: offset,
                 includeDocuments: true,
                 includeMetadatas: true);
@@ -77,13 +67,11 @@ public sealed class Layer1
             if (batch.Length == 0) break;
 
             foreach (var row in batch)
-            {
                 if (row.Document is not null)
                 {
                     docs.Add(row.Document);
                     metas.Add(row.Metadata ?? []);
                 }
-            }
 
             offset += batch.Length;
             if (batch.Length < BatchSize) break;
@@ -97,10 +85,10 @@ public sealed class Layer1
             .Take(MaxDrawers)
             .ToList();
 
-        var sb     = new StringBuilder();
+        var sb = new StringBuilder();
         var byRoom = scored.GroupBy(x => x.meta.GetValueOrDefault("room") as string ?? "general");
 
-        int totalChars = 0;
+        var totalChars = 0;
         foreach (var group in byRoom)
         {
             sb.AppendLine(CultureInfo.InvariantCulture, $"## {group.Key}");
@@ -120,7 +108,7 @@ public sealed class Layer1
     private static int ScoreDrawer(string text)
     {
         var lower = text.ToLowerInvariant();
-        int score = 0;
+        var score = 0;
         foreach (var (_, keywords) in Constants.DefaultHallKeywords)
             score += keywords.Count(k => lower.Contains(k));
         return score;
@@ -131,27 +119,20 @@ public sealed class Layer1
 // Layer 2 — On-demand retrieval (~200-500 tokens, filtered by wing/room)
 // ---------------------------------------------------------------------------
 
-public sealed class Layer2
+public sealed class Layer2(string? palacePath = null, VectorBackend backend = VectorBackend.Chroma)
 {
-    private readonly string _palacePath;
-    private readonly VectorBackend _backend;
-
-    public Layer2(string? palacePath = null, VectorBackend backend = VectorBackend.Chroma)
-    {
-        _palacePath = palacePath ?? Constants.DefaultPalacePath;
-        _backend    = backend;
-    }
+    private readonly string _palacePath = palacePath ?? Constants.DefaultPalacePath;
 
     public string Retrieve(string? wing = null, string? room = null, int nResults = 10)
     {
         if (!Directory.Exists(_palacePath)) return "";
 
-        using var session = PalaceSession.Open(_palacePath, backend: _backend);
+        using var session = PalaceSession.Open(_palacePath, backend: backend);
         var filter = Searcher.BuildFilter(wing, room);
 
         var rows = session.Collection.Get(
-            filter: filter,
-            limit:  nResults,
+            filter,
+            limit: nResults,
             includeDocuments: true,
             includeMetadatas: true);
 
@@ -165,6 +146,7 @@ public sealed class Layer2
             sb.AppendLine(CultureInfo.InvariantCulture, $"[{r}] {row.Document}");
             sb.AppendLine();
         }
+
         return sb.ToString().Trim();
     }
 }
@@ -173,16 +155,9 @@ public sealed class Layer2
 // Layer 3 — Deep semantic search (unlimited depth)
 // ---------------------------------------------------------------------------
 
-public sealed class Layer3
+public sealed class Layer3(string? palacePath = null, VectorBackend backend = VectorBackend.Chroma)
 {
-    private readonly string _palacePath;
-    private readonly VectorBackend _backend;
-
-    public Layer3(string? palacePath = null, VectorBackend backend = VectorBackend.Chroma)
-    {
-        _palacePath = palacePath ?? Constants.DefaultPalacePath;
-        _backend    = backend;
-    }
+    private readonly string _palacePath = palacePath ?? Constants.DefaultPalacePath;
 
     public async Task<string> SearchAsync(
         string query,
@@ -193,16 +168,18 @@ public sealed class Layer3
         CancellationToken ct = default)
     {
         var response = await Searcher.SearchMemoriesAsync(
-            query, _palacePath, embedder, wing, room, nResults, backend: _backend, ct: ct);
+            query, _palacePath, embedder, wing, room, nResults, backend: backend, ct: ct);
 
         if (response.Results.Count == 0) return "";
 
         var sb = new StringBuilder();
         foreach (var hit in response.Results)
         {
-            sb.AppendLine(CultureInfo.InvariantCulture, $"[{hit.Wing}/{hit.Room}] (sim={hit.Similarity:F3}) {hit.Text}");
+            sb.AppendLine(CultureInfo.InvariantCulture,
+                $"[{hit.Wing}/{hit.Room}] (sim={hit.Similarity:F3}) {hit.Text}");
             sb.AppendLine();
         }
+
         return sb.ToString().Trim();
     }
 
@@ -215,7 +192,7 @@ public sealed class Layer3
         CancellationToken ct = default)
     {
         var response = await Searcher.SearchMemoriesAsync(
-            query, _palacePath, embedder, wing, room, nResults, backend: _backend, ct: ct);
+            query, _palacePath, embedder, wing, room, nResults, backend: backend, ct: ct);
         return response.Results;
     }
 }
@@ -226,19 +203,19 @@ public sealed class Layer3
 
 public sealed class MemoryStack
 {
-    private readonly string  _palacePath;
-    private readonly Layer0  _l0;
-    private readonly Layer2  _l2;
-    private readonly Layer3  _l3;
     private readonly VectorBackend _backend;
+    private readonly Layer0 _l0;
+    private readonly Layer2 _l2;
+    private readonly Layer3 _l3;
+    private readonly string _palacePath;
 
     public MemoryStack(string? palacePath = null, string? identityPath = null,
         VectorBackend backend = VectorBackend.Chroma)
     {
         _palacePath = palacePath ?? Constants.DefaultPalacePath;
-        _l0      = new Layer0(identityPath);
-        _l2      = new Layer2(_palacePath, backend);
-        _l3      = new Layer3(_palacePath, backend);
+        _l0 = new Layer0(identityPath);
+        _l2 = new Layer2(_palacePath, backend);
+        _l3 = new Layer3(_palacePath, backend);
         _backend = backend;
     }
 
@@ -248,13 +225,26 @@ public sealed class MemoryStack
         var l1 = new Layer1(_palacePath, wing, _backend).Generate();
 
         var sb = new StringBuilder();
-        if (!string.IsNullOrEmpty(l0)) { sb.AppendLine("# Identity"); sb.AppendLine(l0); sb.AppendLine(); }
-        if (!string.IsNullOrEmpty(l1)) { sb.AppendLine("# Memory");   sb.AppendLine(l1); }
+        if (!string.IsNullOrEmpty(l0))
+        {
+            sb.AppendLine("# Identity");
+            sb.AppendLine(l0);
+            sb.AppendLine();
+        }
+
+        if (!string.IsNullOrEmpty(l1))
+        {
+            sb.AppendLine("# Memory");
+            sb.AppendLine(l1);
+        }
+
         return sb.ToString().Trim();
     }
 
     public string Recall(string? wing = null, string? room = null, int nResults = 10)
-        => _l2.Retrieve(wing, room, nResults);
+    {
+        return _l2.Retrieve(wing, room, nResults);
+    }
 
     public Task<string> SearchAsync(
         string query,
@@ -263,13 +253,19 @@ public sealed class MemoryStack
         string? room = null,
         int nResults = 5,
         CancellationToken ct = default)
-        => _l3.SearchAsync(query, embedder, wing, room, nResults, ct);
+    {
+        return _l3.SearchAsync(query, embedder, wing, room, nResults, ct);
+    }
 
-    public MemoryStackStatus Status() => new(
-        Layer0Tokens: _l0.TokenEstimate(),
-        IdentityPath: File.Exists(
-            Path.Combine(Constants.DefaultConfigDir, "identity.txt"))
-            ? Constants.DefaultIdentityPath : null);
+    public MemoryStackStatus Status()
+    {
+        return new MemoryStackStatus(
+            _l0.TokenEstimate(),
+            File.Exists(
+                Path.Combine(Constants.DefaultConfigDir, "identity.txt"))
+                ? Constants.DefaultIdentityPath
+                : null);
+    }
 }
 
 public sealed record MemoryStackStatus(int Layer0Tokens, string? IdentityPath);

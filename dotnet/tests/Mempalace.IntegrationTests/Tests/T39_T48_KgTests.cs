@@ -7,19 +7,26 @@ namespace Mempalace.IntegrationTests.Tests;
 public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, IDisposable
 {
     private readonly PalaceFactory _factory = new(embedder.Embedder);
-    private McpToolContext _sqliteCtx = null!;
     private McpToolContext _chromaCtx = null!;
+    private McpToolContext _sqliteCtx = null!;
 
     public async ValueTask InitializeAsync()
     {
-        (_sqliteCtx, _) = _factory.CreateContext(VectorBackend.Sqlite);
+        (_sqliteCtx, _) = _factory.CreateContext();
         (_chromaCtx, _) = _factory.CreateContext(VectorBackend.Chroma);
         await Seed.ApplyAsync(_sqliteCtx);
         await Seed.ApplyAsync(_chromaCtx);
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-    public void Dispose() => _factory.Dispose();
+    public ValueTask DisposeAsync()
+    {
+        return ValueTask.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        _factory.Dispose();
+    }
 
     [Theory]
     [InlineData(VectorBackend.Sqlite)]
@@ -27,7 +34,7 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
     public async Task T39_KgStats_AfterSeeding(VectorBackend backend)
     {
         var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
-        var s   = await McpHarness.SessionAsync(ctx,
+        var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_kg_stats", new { }));
 
         var r = s.Result(2);
@@ -36,9 +43,9 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
         Assert.True(r["currentFacts"]!.GetValue<int>() < r["triples"]!.GetValue<int>());
         var types = r["relationshipTypes"]!.AsArray()
             .Select(x => x!.GetValue<string>()).ToHashSet();
-        Assert.Contains("owns",       types);
+        Assert.Contains("owns", types);
         Assert.Contains("depends_on", types);
-        Assert.Contains("uses",       types);
+        Assert.Contains("uses", types);
     }
 
     [Theory]
@@ -47,14 +54,14 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
     public async Task T40_KgQuery_RileyOutgoing_OwnsAuthService(VectorBackend backend)
     {
         var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
-        var s   = await McpHarness.SessionAsync(ctx,
+        var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_kg_query",
                 new { entity = "Riley", direction = "outgoing" }));
 
         var triples = s.Result(2)["triples"]!.AsArray();
         Assert.Contains(triples, t =>
             t!["predicate"]!.GetValue<string>() == "owns" &&
-            t!["object"]!.GetValue<string>()    == "auth-service");
+            t!["object"]!.GetValue<string>() == "auth-service");
     }
 
     [Theory]
@@ -63,13 +70,13 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
     public async Task T41_KgQuery_AuthServiceIncoming_RileyOwns(VectorBackend backend)
     {
         var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
-        var s   = await McpHarness.SessionAsync(ctx,
+        var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_kg_query",
                 new { entity = "auth-service", direction = "incoming" }));
 
         var triples = s.Result(2)["triples"]!.AsArray();
         Assert.Contains(triples, t =>
-            t!["subject"]!.GetValue<string>()   == "riley" &&
+            t!["subject"]!.GetValue<string>() == "riley" &&
             t!["predicate"]!.GetValue<string>() == "owns");
     }
 
@@ -79,13 +86,13 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
     public async Task T42_KgQuery_AuthServiceBoth_OutgoingAndIncoming(VectorBackend backend)
     {
         var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
-        var s   = await McpHarness.SessionAsync(ctx,
+        var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_kg_query",
                 new { entity = "auth-service", direction = "both" }));
 
         var triples = s.Result(2)["triples"]!.AsArray();
-        bool hasOutgoing = triples.Any(t => t!["subject"]!.GetValue<string>() == "auth-service");
-        bool hasIncoming = triples.Any(t => t!["object"]!.GetValue<string>()  == "auth-service");
+        var hasOutgoing = triples.Any(t => t!["subject"]!.GetValue<string>() == "auth-service");
+        var hasIncoming = triples.Any(t => t!["object"]!.GetValue<string>() == "auth-service");
         Assert.True(hasOutgoing && hasIncoming);
     }
 
@@ -95,14 +102,14 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
     public async Task T43_KgQuery_TemporalBeforeMigration_MysqlPresent(VectorBackend backend)
     {
         var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
-        var s   = await McpHarness.SessionAsync(ctx,
+        var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_kg_query",
                 new { entity = "auth-service", as_of = "2023-06-01" }));
 
         var triples = s.Result(2)["triples"]!.AsArray();
         Assert.Contains(triples, t =>
             t!["predicate"]!.GetValue<string>() == "uses" &&
-            t!["object"]!.GetValue<string>()    == "mysql");
+            t!["object"]!.GetValue<string>() == "mysql");
     }
 
     [Theory]
@@ -111,17 +118,17 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
     public async Task T44_KgQuery_TemporalAfterMigration_MysqlAbsentJwtPresent(VectorBackend backend)
     {
         var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
-        var s   = await McpHarness.SessionAsync(ctx,
+        var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_kg_query",
                 new { entity = "auth-service", as_of = "2024-06-01" }));
 
         var triples = s.Result(2)["triples"]!.AsArray();
         Assert.DoesNotContain(triples, t =>
             t!["predicate"]!.GetValue<string>() == "uses" &&
-            t!["object"]!.GetValue<string>()    == "mysql");
+            t!["object"]!.GetValue<string>() == "mysql");
         Assert.Contains(triples, t =>
             t!["predicate"]!.GetValue<string>() == "uses" &&
-            t!["object"]!.GetValue<string>()    == "jwt");
+            t!["object"]!.GetValue<string>() == "jwt");
     }
 
     [Theory]
@@ -130,7 +137,7 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
     public async Task T45_KgInvalidate_RileyOwns_NotReturnedAfterEndDate(VectorBackend backend)
     {
         var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
-        var s   = await McpHarness.SessionAsync(ctx,
+        var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_kg_invalidate",
                 new { subject = "Riley", predicate = "owns", @object = "auth-service", ended = "2024-12-01" }),
             McpHarness.Call(3, "mempalace_kg_query",
@@ -140,7 +147,7 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
         var triples = s.Result(3)["triples"]!.AsArray();
         Assert.DoesNotContain(triples, t =>
             t!["predicate"]!.GetValue<string>() == "owns" &&
-            t!["object"]!.GetValue<string>()    == "auth-service");
+            t!["object"]!.GetValue<string>() == "auth-service");
     }
 
     [Theory]
@@ -149,7 +156,7 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
     public async Task T46_KgTimeline_NoFilter_NonEmpty(VectorBackend backend)
     {
         var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
-        var s   = await McpHarness.SessionAsync(ctx,
+        var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_kg_timeline", new { }));
 
         Assert.NotEmpty(s.Result(2)["timeline"]!.AsArray());
@@ -161,7 +168,7 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
     public async Task T47_KgTimeline_EntityFilter_OnlySamTriples(VectorBackend backend)
     {
         var ctx = backend == VectorBackend.Sqlite ? _sqliteCtx : _chromaCtx;
-        var s   = await McpHarness.SessionAsync(ctx,
+        var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_kg_timeline", new { entity = "Sam" }));
 
         var timeline = s.Result(2)["timeline"]!.AsArray();
@@ -169,7 +176,7 @@ public sealed class T39_T48_KgTests(EmbedderFixture embedder) : IAsyncLifetime, 
         foreach (var t in timeline)
         {
             var subj = t!["subject"]!.GetValue<string>();
-            var obj  = t!["object"]!.GetValue<string>();
+            var obj = t!["object"]!.GetValue<string>();
             Assert.True(subj == "sam" || obj == "sam");
         }
     }

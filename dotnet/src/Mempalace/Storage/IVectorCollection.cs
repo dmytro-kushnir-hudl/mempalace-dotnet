@@ -10,7 +10,7 @@ public interface IVectorCollection : IDisposable
 {
     // ── Write ─────────────────────────────────────────────────────────────────
 
-    /// <summary>Embed <paramref name="documents"/> and upsert with metadata.</summary>
+    /// <summary>Embed <paramref name="documents" /> and upsert with metadata.</summary>
     Task UpsertAsync(
         string[] ids,
         string[] documents,
@@ -58,4 +58,4 @@ public sealed record VectorSearchResult(
     string Id,
     string? Document,
     Dictionary<string, object?>? Metadata,
-    double Similarity);  // 0..1, higher = more similar
+    double Similarity); // 0..1, higher = more similar

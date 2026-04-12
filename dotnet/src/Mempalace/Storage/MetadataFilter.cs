@@ -8,6 +8,8 @@ public sealed class MetadataFilter
 {
     private readonly Dictionary<string, object?> _clauses = new();
 
+    public IReadOnlyDictionary<string, object?> Clauses => _clauses;
+
     public static MetadataFilter Where(string key, object? value)
     {
         var f = new MetadataFilter();
@@ -20,6 +22,4 @@ public sealed class MetadataFilter
         _clauses[key] = value;
         return this;
     }
-
-    public IReadOnlyDictionary<string, object?> Clauses => _clauses;
 }

@@ -1,9 +1,8 @@
-using Microsoft.Extensions.AI;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
-using Chroma.Embeddings;
 using Mempalace.Storage;
+using Microsoft.Extensions.AI;
 
 namespace Mempalace;
 
@@ -19,25 +18,51 @@ public sealed class McpToolContext(
     IEmbeddingGenerator<string, Embedding<float>> embedder,
     VectorBackend backend = VectorBackend.Chroma)
 {
-    public string PalacePath      { get; } = palacePath;
-    public string CollectionName  { get; } = collectionName;
-    public string KgPath          { get; } = kgPath;
-    public VectorBackend Backend  { get; } = backend;
+    public string PalacePath { get; } = palacePath;
+    public string CollectionName { get; } = collectionName;
+    public string KgPath { get; } = kgPath;
+    public VectorBackend Backend { get; } = backend;
     public IEmbeddingGenerator<string, Embedding<float>> Embedder { get; } = embedder;
 
-    public PalaceSession OpenPalace() => PalaceSession.Open(PalacePath, CollectionName, Backend);
-    public KnowledgeGraph OpenKg()    => new(KgPath);
+    public PalaceSession OpenPalace()
+    {
+        return PalaceSession.Open(PalacePath, CollectionName, Backend);
+    }
+
+    public KnowledgeGraph OpenKg()
+    {
+        return new KnowledgeGraph(KgPath);
+    }
 }
 
 public static class McpTools
 {
+    // ── AAAK & Protocol spec ─────────────────────────────────────────────────
+
+    public const string PalaceProtocol = """
+                                         IMPORTANT — MemPalace Memory Protocol:
+                                         1. ON WAKE-UP: Call mempalace_status to load palace overview + AAAK spec.
+                                         2. BEFORE RESPONDING about any person, project, or past event: call mempalace_kg_query or mempalace_search FIRST. Never guess — verify.
+                                         3. IF UNSURE about a fact: say "let me check" and query the palace.
+                                         4. AFTER EACH SESSION: call mempalace_diary_write to record what happened.
+                                         5. WHEN FACTS CHANGE: call mempalace_kg_invalidate + mempalace_kg_add.
+                                         """;
+
+    public const string AaakSpec = """
+                                   AAAK — compressed memory dialect. Readable by humans and LLMs without decoding.
+                                   ENTITIES: 3-letter codes. ALC=Alice, JOR=Jordan, RIL=Riley, MAX=Max, BEN=Ben.
+                                   EMOTIONS: *markers*. *warm*=joy, *fierce*=determined, *raw*=vulnerable, *bloom*=tenderness.
+                                   STRUCTURE: FAM: family | PROJ: projects | ⚠: warnings. Dates: ISO. Counts: Nx.
+                                   EXAMPLE: FAM: ALC→♡JOR | 2D(kids): RIL(18,sports) MAX(11,chess+swimming)
+                                   """;
+
     // All tool responses use camelCase for consistency.
     private static readonly JsonSerializerOptions CamelCase = new()
     {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    private static readonly string WalDir  = Path.Combine(Constants.DefaultConfigDir, "wal");
+    private static readonly string WalDir = Path.Combine(Constants.DefaultConfigDir, "wal");
     private static readonly string WalFile = Path.Combine(WalDir, "write_log.jsonl");
 
     private static void WalLog(string op, object p, object? result = null)
@@ -49,32 +74,16 @@ public static class McpTools
             {
                 timestamp = DateTime.UtcNow.ToString("O"),
                 operation = op,
-                @params   = p,
+                @params = p,
                 result
             });
             File.AppendAllText(WalFile, entry + "\n");
         }
-        catch { /* WAL must never crash the tool */ }
+        catch
+        {
+            /* WAL must never crash the tool */
+        }
     }
-
-    // ── AAAK & Protocol spec ─────────────────────────────────────────────────
-
-    public const string PalaceProtocol = """
-        IMPORTANT — MemPalace Memory Protocol:
-        1. ON WAKE-UP: Call mempalace_status to load palace overview + AAAK spec.
-        2. BEFORE RESPONDING about any person, project, or past event: call mempalace_kg_query or mempalace_search FIRST. Never guess — verify.
-        3. IF UNSURE about a fact: say "let me check" and query the palace.
-        4. AFTER EACH SESSION: call mempalace_diary_write to record what happened.
-        5. WHEN FACTS CHANGE: call mempalace_kg_invalidate + mempalace_kg_add.
-        """;
-
-    public const string AaakSpec = """
-        AAAK — compressed memory dialect. Readable by humans and LLMs without decoding.
-        ENTITIES: 3-letter codes. ALC=Alice, JOR=Jordan, RIL=Riley, MAX=Max, BEN=Ben.
-        EMOTIONS: *markers*. *warm*=joy, *fierce*=determined, *raw*=vulnerable, *bloom*=tenderness.
-        STRUCTURE: FAM: family | PROJ: projects | ⚠: warnings. Dates: ISO. Counts: Nx.
-        EXAMPLE: FAM: ALC→♡JOR | 2D(kids): RIL(18,sports) MAX(11,chess+swimming)
-        """;
 
     // ── Status & exploration ─────────────────────────────────────────────────
 
@@ -91,12 +100,15 @@ public static class McpTools
                 wings,
                 rooms,
                 palace_path = ctx.PalacePath,
-                backend     = ctx.Backend.ToString("G"),
-                protocol    = PalaceProtocol,
-                aaak_dialect = AaakSpec,
+                backend = ctx.Backend.ToString("G"),
+                protocol = PalaceProtocol,
+                aaak_dialect = AaakSpec
             }))!;
         }
-        catch { return new JsonObject { ["error"] = "No palace found", ["hint"] = "Run: mempalace mine <dir>" }; }
+        catch
+        {
+            return new JsonObject { ["error"] = "No palace found", ["hint"] = "Run: mempalace mine <dir>" };
+        }
     }
 
     public static JsonNode ListWings(McpToolContext ctx)
@@ -107,7 +119,10 @@ public static class McpTools
             var (wings, _) = GetWingsAndRooms(s.Collection);
             return JsonNode.Parse(JsonSerializer.Serialize(new { wings }))!;
         }
-        catch { return NoPalace(); }
+        catch
+        {
+            return NoPalace();
+        }
     }
 
     public static JsonNode ListRooms(McpToolContext ctx, string? wing = null)
@@ -115,37 +130,46 @@ public static class McpTools
         try
         {
             using var s = ctx.OpenPalace();
-            var filter  = wing is not null ? MetadataFilter.Where("wing", wing) : null;
-            var rows    = s.Collection.Get(filter: filter, limit: 10_000, includeMetadatas: true, includeDocuments: false);
-            var rooms   = rows
+            var filter = wing is not null ? MetadataFilter.Where("wing", wing) : null;
+            var rows = s.Collection.Get(filter, limit: 10_000, includeMetadatas: true, includeDocuments: false);
+            var rooms = rows
                 .GroupBy(r => r.Metadata?.GetValueOrDefault("room") as string ?? "general")
                 .ToDictionary(g => g.Key, g => g.Count());
             return JsonNode.Parse(JsonSerializer.Serialize(new { wing, rooms }))!;
         }
-        catch { return NoPalace(); }
+        catch
+        {
+            return NoPalace();
+        }
     }
 
     public static JsonNode GetTaxonomy(McpToolContext ctx)
     {
         try
         {
-            using var s  = ctx.OpenPalace();
-            var rows     = s.Collection.Get(limit: 10_000, includeMetadatas: true, includeDocuments: false);
-            var tree     = new Dictionary<string, Dictionary<string, int>>();
+            using var s = ctx.OpenPalace();
+            var rows = s.Collection.Get(limit: 10_000, includeMetadatas: true, includeDocuments: false);
+            var tree = new Dictionary<string, Dictionary<string, int>>();
             foreach (var row in rows)
             {
                 var w = row.Metadata?.GetValueOrDefault("wing") as string ?? "unknown";
                 var r = row.Metadata?.GetValueOrDefault("room") as string ?? "general";
-                if (!tree.ContainsKey(w)) tree[w] = new();
+                if (!tree.ContainsKey(w)) tree[w] = new Dictionary<string, int>();
                 tree[w][r] = tree[w].GetValueOrDefault(r) + 1;
             }
+
             return JsonNode.Parse(JsonSerializer.Serialize(new { taxonomy = tree }))!;
         }
-        catch { return NoPalace(); }
+        catch
+        {
+            return NoPalace();
+        }
     }
 
-    public static JsonNode GetAaakSpec(McpToolContext _) =>
-        new JsonObject { ["spec"] = AaakSpec, ["protocol"] = PalaceProtocol };
+    public static JsonNode GetAaakSpec(McpToolContext _)
+    {
+        return new JsonObject { ["spec"] = AaakSpec, ["protocol"] = PalaceProtocol };
+    }
 
     // ── Search ───────────────────────────────────────────────────────────────
 
@@ -154,7 +178,8 @@ public static class McpTools
         string? wing = null, string? room = null, CancellationToken ct = default)
     {
         if (limit <= 0)
-            return JsonNode.Parse(JsonSerializer.Serialize(new { query, wing, room, results = Array.Empty<object>() }, CamelCase))!;
+            return JsonNode.Parse(JsonSerializer.Serialize(new { query, wing, room, results = Array.Empty<object>() },
+                CamelCase))!;
         try
         {
             var response = await Searcher.SearchMemoriesAsync(
@@ -162,7 +187,10 @@ public static class McpTools
                 ctx.CollectionName, ctx.Backend, ct);
             return JsonNode.Parse(JsonSerializer.Serialize(response, CamelCase))!;
         }
-        catch (SearchError ex) { return new JsonObject { ["error"] = ex.Message }; }
+        catch (SearchError ex)
+        {
+            return new JsonObject { ["error"] = ex.Message };
+        }
     }
 
     public static async Task<JsonNode> CheckDuplicateAsync(
@@ -171,14 +199,17 @@ public static class McpTools
         try
         {
             using var s = ctx.OpenPalace();
-            var results = await s.Collection.SearchAsync(content, ctx.Embedder, nResults: 5, ct: ct);
+            var results = await s.Collection.SearchAsync(content, ctx.Embedder, ct: ct);
             var dupes = results
                 .Where(r => r.Similarity >= threshold)
                 .Select(r => (object)new { id = r.Id, similarity = Math.Round(r.Similarity, 3) })
                 .ToList();
             return JsonNode.Parse(JsonSerializer.Serialize(new { is_duplicate = dupes.Count > 0, matches = dupes }))!;
         }
-        catch { return NoPalace(); }
+        catch
+        {
+            return NoPalace();
+        }
     }
 
     // ── Graph (BFS over rooms) ────────────────────────────────────────────────
@@ -190,7 +221,10 @@ public static class McpTools
             using var s = ctx.OpenPalace();
             return PalaceGraph.Traverse(s.Collection, startRoom, maxHops);
         }
-        catch { return NoPalace(); }
+        catch
+        {
+            return NoPalace();
+        }
     }
 
     public static JsonNode FindTunnels(McpToolContext ctx, string? wingA = null, string? wingB = null)
@@ -201,7 +235,10 @@ public static class McpTools
             var tunnels = PalaceGraph.FindTunnels(s.Collection, wingA, wingB);
             return JsonNode.Parse(JsonSerializer.Serialize(new { tunnels }))!;
         }
-        catch { return NoPalace(); }
+        catch
+        {
+            return NoPalace();
+        }
     }
 
     public static JsonNode GraphStats(McpToolContext ctx)
@@ -212,7 +249,10 @@ public static class McpTools
             var stats = PalaceGraph.GraphStats(s.Collection);
             return JsonNode.Parse(JsonSerializer.Serialize(stats, CamelCase))!;
         }
-        catch { return NoPalace(); }
+        catch
+        {
+            return NoPalace();
+        }
     }
 
     // ── General extractor ─────────────────────────────────────────────────────
@@ -232,11 +272,14 @@ public static class McpTools
                 {
                     memory_type = m.MemoryType.ToString("G").ToLowerInvariant(),
                     chunk_index = m.ChunkIndex,
-                    content     = m.Content,
-                }),
+                    content = m.Content
+                })
             }))!;
         }
-        catch (Exception ex) { return new JsonObject { ["error"] = ex.Message }; }
+        catch (Exception ex)
+        {
+            return new JsonObject { ["error"] = ex.Message };
+        }
     }
 
     // ── Entity detector ───────────────────────────────────────────────────────
@@ -248,12 +291,15 @@ public static class McpTools
             var result = EntityDetector.DetectFromText(text);
             return JsonNode.Parse(JsonSerializer.Serialize(new
             {
-                people    = result.People,
-                projects  = result.Projects,
-                uncertain = result.Uncertain,
+                people = result.People,
+                projects = result.Projects,
+                uncertain = result.Uncertain
             }))!;
         }
-        catch (Exception ex) { return new JsonObject { ["error"] = ex.Message }; }
+        catch (Exception ex)
+        {
+            return new JsonObject { ["error"] = ex.Message };
+        }
     }
 
     // ── AAAK Compress ─────────────────────────────────────────────────────────
@@ -263,18 +309,21 @@ public static class McpTools
     {
         try
         {
-            var dialect    = new Dialect();
+            var dialect = new Dialect();
             var compressed = dialect.Compress(text, metadata);
-            var stats      = Dialect.GetCompressionStats(text, compressed);
+            var stats = Dialect.GetCompressionStats(text, compressed);
             return JsonNode.Parse(JsonSerializer.Serialize(new
             {
                 compressed,
                 original_tokens_est = stats.OriginalTokensEst,
-                summary_tokens_est  = stats.SummaryTokensEst,
-                size_ratio          = stats.SizeRatio,
+                summary_tokens_est = stats.SummaryTokensEst,
+                size_ratio = stats.SizeRatio
             }))!;
         }
-        catch (Exception ex) { return new JsonObject { ["error"] = ex.Message }; }
+        catch (Exception ex)
+        {
+            return new JsonObject { ["error"] = ex.Message };
+        }
     }
 
     // ── Write: drawers ────────────────────────────────────────────────────────
@@ -291,7 +340,10 @@ public static class McpTools
             Sanitizer.SanitizeName(room, "room");
             Sanitizer.SanitizeContent(content);
         }
-        catch (ArgumentException ex) { return new JsonObject { ["error"] = ex.Message }; }
+        catch (ArgumentException ex)
+        {
+            return new JsonObject { ["error"] = ex.Message };
+        }
 
         WalLog("add_drawer", new { wing, room, content_length = content.Length, addedBy });
 
@@ -301,22 +353,24 @@ public static class McpTools
             // Deterministic id (no source_file mtime for MCP-sourced content)
             var seed = Encoding.UTF8.GetBytes(wing + room + content[..Math.Min(64, content.Length)]);
             var hash = Convert.ToHexString(SHA256.HashData(seed)).ToLowerInvariant()[..24];
-            var id   = $"drawer_{wing}_{room}_{hash}";
+            var id = $"drawer_{wing}_{room}_{hash}";
 
             await s.Collection.UpsertAsync(
-                ids: [id],
-                documents: [content],
-                embedder: ctx.Embedder,
-                metadatas: [new Dictionary<string, object?>
-                {
-                    ["wing"]        = wing,
-                    ["room"]        = room,
-                    ["source_file"] = sourceFile,
-                    ["chunk_index"] = 0L,
-                    ["added_by"]    = addedBy,
-                    ["filed_at"]    = DateTime.UtcNow.ToString("O"),
-                }],
-                ct: ct);
+                [id],
+                [content],
+                ctx.Embedder,
+                [
+                    new Dictionary<string, object?>
+                    {
+                        ["wing"] = wing,
+                        ["room"] = room,
+                        ["source_file"] = sourceFile,
+                        ["chunk_index"] = 0L,
+                        ["added_by"] = addedBy,
+                        ["filed_at"] = DateTime.UtcNow.ToString("O")
+                    }
+                ],
+                ct);
 
             WalLog("add_drawer_result", new { id }, new { success = true });
             return new JsonObject { ["success"] = true, ["drawer_id"] = id };
@@ -341,7 +395,10 @@ public static class McpTools
             WalLog("delete_drawer_result", new { drawerId }, new { success = true });
             return new JsonObject { ["success"] = true, ["drawer_id"] = drawerId };
         }
-        catch (Exception ex) { return new JsonObject { ["success"] = false, ["error"] = ex.Message }; }
+        catch (Exception ex)
+        {
+            return new JsonObject { ["success"] = false, ["error"] = ex.Message };
+        }
     }
 
     // ── Knowledge graph ───────────────────────────────────────────────────────
@@ -355,7 +412,10 @@ public static class McpTools
             var triples = kg.QueryEntity(entity, asOf, direction);
             return JsonNode.Parse(JsonSerializer.Serialize(new { entity, triples }, CamelCase))!;
         }
-        catch (Exception ex) { return new JsonObject { ["error"] = ex.Message }; }
+        catch (Exception ex)
+        {
+            return new JsonObject { ["error"] = ex.Message };
+        }
     }
 
     public static JsonNode KgAdd(McpToolContext ctx,
@@ -370,7 +430,10 @@ public static class McpTools
             var id = kg.AddTriple(subject, predicate, obj, validFrom, validTo, confidence, sourceCloset);
             return new JsonObject { ["success"] = true, ["triple_id"] = id };
         }
-        catch (Exception ex) { return new JsonObject { ["success"] = false, ["error"] = ex.Message }; }
+        catch (Exception ex)
+        {
+            return new JsonObject { ["success"] = false, ["error"] = ex.Message };
+        }
     }
 
     public static JsonNode KgInvalidate(McpToolContext ctx,
@@ -383,7 +446,10 @@ public static class McpTools
             kg.Invalidate(subject, predicate, obj, ended);
             return new JsonObject { ["success"] = true };
         }
-        catch (Exception ex) { return new JsonObject { ["success"] = false, ["error"] = ex.Message }; }
+        catch (Exception ex)
+        {
+            return new JsonObject { ["success"] = false, ["error"] = ex.Message };
+        }
     }
 
     public static JsonNode KgTimeline(McpToolContext ctx, string? entity = null)
@@ -393,7 +459,10 @@ public static class McpTools
             using var kg = ctx.OpenKg();
             return JsonNode.Parse(JsonSerializer.Serialize(new { timeline = kg.Timeline(entity) }, CamelCase))!;
         }
-        catch (Exception ex) { return new JsonObject { ["error"] = ex.Message }; }
+        catch (Exception ex)
+        {
+            return new JsonObject { ["error"] = ex.Message };
+        }
     }
 
     public static JsonNode KgStats(McpToolContext ctx)
@@ -403,7 +472,10 @@ public static class McpTools
             using var kg = ctx.OpenKg();
             return JsonNode.Parse(JsonSerializer.Serialize(kg.Stats(), CamelCase))!;
         }
-        catch (Exception ex) { return new JsonObject { ["error"] = ex.Message }; }
+        catch (Exception ex)
+        {
+            return new JsonObject { ["error"] = ex.Message };
+        }
     }
 
     // ── Diary ─────────────────────────────────────────────────────────────────
@@ -416,54 +488,59 @@ public static class McpTools
         try
         {
             var wing = $"wing_{agentName.ToLowerInvariant().Replace(' ', '_')}";
-            var now  = DateTime.UtcNow;
+            var now = DateTime.UtcNow;
             var seed = Encoding.UTF8.GetBytes(agentName + now.ToString("O", CultureInfo.InvariantCulture));
             var hash = Convert.ToHexString(SHA256.HashData(seed)).ToLowerInvariant()[..16];
-            var id   = $"diary_{wing}_{now:yyyyMMdd_HHmmss}_{hash}";
+            var id = $"diary_{wing}_{now:yyyyMMdd_HHmmss}_{hash}";
 
             using var s = ctx.OpenPalace();
             await s.Collection.UpsertAsync(
-                ids: [id],
-                documents: [entry],
-                embedder: ctx.Embedder,
-                metadatas: [new Dictionary<string, object?>
-                {
-                    ["wing"]       = wing,
-                    ["room"]       = "diary",
-                    ["hall"]       = "hall_diary",
-                    ["topic"]      = topic,
-                    ["type"]       = "diary_entry",
-                    ["agent"]      = agentName,
-                    ["filed_at"]   = now.ToString("O", CultureInfo.InvariantCulture),
-                    ["date"]       = now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                    ["source_file"] = "",
-                    ["chunk_index"] = 0L,
-                    ["added_by"]   = "mcp",
-                }],
-                ct: ct);
+                [id],
+                [entry],
+                ctx.Embedder,
+                [
+                    new Dictionary<string, object?>
+                    {
+                        ["wing"] = wing,
+                        ["room"] = "diary",
+                        ["hall"] = "hall_diary",
+                        ["topic"] = topic,
+                        ["type"] = "diary_entry",
+                        ["agent"] = agentName,
+                        ["filed_at"] = now.ToString("O", CultureInfo.InvariantCulture),
+                        ["date"] = now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                        ["source_file"] = "",
+                        ["chunk_index"] = 0L,
+                        ["added_by"] = "mcp"
+                    }
+                ],
+                ct);
 
             return new JsonObject { ["success"] = true, ["entry_id"] = id };
         }
-        catch (Exception ex) { return new JsonObject { ["success"] = false, ["error"] = ex.Message }; }
+        catch (Exception ex)
+        {
+            return new JsonObject { ["success"] = false, ["error"] = ex.Message };
+        }
     }
 
     public static JsonNode DiaryRead(McpToolContext ctx, string agentName, int lastN = 10)
     {
         try
         {
-            var wing   = $"wing_{agentName.ToLowerInvariant().Replace(' ', '_')}";
+            var wing = $"wing_{agentName.ToLowerInvariant().Replace(' ', '_')}";
             var filter = MetadataFilter.Where("wing", wing).And("room", "diary");
             using var s = ctx.OpenPalace();
-            var rows = s.Collection.Get(filter: filter, limit: 10_000,
+            var rows = s.Collection.Get(filter, limit: 10_000,
                 includeDocuments: true, includeMetadatas: true);
 
             var entries = rows
                 .Select(r => new
                 {
-                    date      = r.Metadata?.GetValueOrDefault("date")     as string ?? "",
+                    date = r.Metadata?.GetValueOrDefault("date") as string ?? "",
                     timestamp = r.Metadata?.GetValueOrDefault("filed_at") as string ?? "",
-                    topic     = r.Metadata?.GetValueOrDefault("topic")    as string ?? "",
-                    content   = r.Document ?? "",
+                    topic = r.Metadata?.GetValueOrDefault("topic") as string ?? "",
+                    content = r.Document ?? ""
                 })
                 .OrderByDescending(e => e.timestamp)
                 .Take(lastN)
@@ -471,7 +548,10 @@ public static class McpTools
 
             return JsonNode.Parse(JsonSerializer.Serialize(new { agent = agentName, entries, total = rows.Length }))!;
         }
-        catch { return NoPalace(); }
+        catch
+        {
+            return NoPalace();
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -492,10 +572,16 @@ public static class McpTools
                 rooms[r] = rooms.GetValueOrDefault(r) + 1;
             }
         }
-        catch { /* empty */ }
+        catch
+        {
+            /* empty */
+        }
+
         return (wings, rooms);
     }
 
-    private static JsonObject NoPalace() =>
-        new() { ["error"] = "No palace found", ["hint"] = "Run: mempalace mine <dir>" };
+    private static JsonObject NoPalace()
+    {
+        return new JsonObject { ["error"] = "No palace found", ["hint"] = "Run: mempalace mine <dir>" };
+    }
 }

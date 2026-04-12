@@ -1,8 +1,11 @@
-using Microsoft.Extensions.AI;
+using System.Buffers;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
-using Chroma.Embeddings;
+using System.Text.RegularExpressions;
+using System.Threading.Channels;
 using Mempalace.Storage;
+using Microsoft.Extensions.AI;
 
 namespace Mempalace;
 
@@ -28,24 +31,31 @@ public sealed record MinerOptions(
 
 public static class Miner
 {
+    private const int BatchSize = 32;
+
+    private static readonly ArrayPool<string> StringPool =
+        ArrayPool<string>.Shared;
+
+    private static readonly ArrayPool<Dictionary<string, object?>> MetaPool =
+        ArrayPool<Dictionary<string, object?>>.Shared;
     // -------------------------------------------------------------------------
     // ChunkText — mirrors Python chunk_text exactly
     // -------------------------------------------------------------------------
 
-    public static IReadOnlyList<Chunk> ChunkText(string content)
+    public static List<Chunk> ChunkText(string content)
     {
         var chunks = new List<Chunk>();
-        var span   = content.AsSpan();
-        int start  = 0;
+        var span = content.AsSpan();
+        var start = 0;
 
         while (start < span.Length)
         {
-            int end = Math.Min(start + Constants.ChunkSize, span.Length);
+            var end = Math.Min(start + Constants.ChunkSize, span.Length);
 
             if (end < span.Length)
             {
-                int half    = start + Constants.ChunkSize / 2;
-                int breakAt = content.LastIndexOf("\n\n", end, end - half, StringComparison.Ordinal);
+                var half = start + Constants.ChunkSize / 2;
+                var breakAt = content.LastIndexOf("\n\n", end, end - half, StringComparison.Ordinal);
                 if (breakAt == -1)
                     breakAt = content.LastIndexOf('\n', end, end - half);
                 if (breakAt != -1)
@@ -69,9 +79,21 @@ public static class Miner
 
     public static string DrawerId(string wing, string room, string sourceFile, int chunkIndex)
     {
-        var input = Encoding.UTF8.GetBytes(sourceFile + chunkIndex);
-        var hash  = Convert.ToHexString(SHA256.HashData(input)).ToLowerInvariant()[..24];
-        return $"drawer_{wing}_{room}_{hash}";
+        // Encode directly into a pooled buffer — avoid sourceFile+chunkIndex string alloc
+        var maxBytes = Encoding.UTF8.GetMaxByteCount(sourceFile.Length) + 11; // 11 = max int digits
+        var buf = System.Buffers.ArrayPool<byte>.Shared.Rent(maxBytes);
+        try
+        {
+            int written = Encoding.UTF8.GetBytes(sourceFile, buf);
+            // Append chunkIndex bytes
+            int idx = chunkIndex;
+            do { buf[written++] = (byte)('0' + idx % 10); idx /= 10; } while (idx > 0);
+            Span<byte> hashBytes = stackalloc byte[32];
+            SHA256.HashData(buf.AsSpan(0, written), hashBytes);
+            // Lower-hex first 12 bytes → 24 chars
+            return $"drawer_{wing}_{room}_{Convert.ToHexString(hashBytes[..12]).ToLowerInvariant()}";
+        }
+        finally { System.Buffers.ArrayPool<byte>.Shared.Return(buf); }
     }
 
     // -------------------------------------------------------------------------
@@ -92,32 +114,22 @@ public static class Miner
         var id = DrawerId(wing, room, sourceFile, chunkIndex);
         var metadata = new Dictionary<string, object?>
         {
-            ["wing"]         = wing,
-            ["room"]         = room,
-            ["source_file"]  = sourceFile,
-            ["chunk_index"]  = (long)chunkIndex,
-            ["added_by"]     = agent,
-            ["filed_at"]     = DateTime.UtcNow.ToString("O"),
-            ["source_mtime"] = PalaceSession.GetUnixMtime(sourceFile),
+            ["wing"] = wing,
+            ["room"] = room,
+            ["source_file"] = sourceFile,
+            ["chunk_index"] = (long)chunkIndex,
+            ["added_by"] = agent,
+            ["filed_at"] = DateTime.UtcNow.ToString("O"),
+            ["source_mtime"] = PalaceSession.GetUnixMtime(sourceFile)
         };
 
         await collection.UpsertAsync(
-            ids: [id],
-            documents: [content],
-            embedder: embedder,
-            metadatas: [metadata],
-            ct: ct);
+            [id],
+            [content],
+            embedder,
+            [metadata],
+            ct);
     }
-
-    private const int BatchSize = 32;
-
-    private record PendingChunk(string Wing, string Room, string Content,
-        string SourceFile, int ChunkIndex, string Agent, double Mtime);
-
-    private static readonly System.Buffers.ArrayPool<string> StringPool =
-        System.Buffers.ArrayPool<string>.Shared;
-    private static readonly System.Buffers.ArrayPool<Dictionary<string, object?>> MetaPool =
-        System.Buffers.ArrayPool<Dictionary<string, object?>>.Shared;
 
     private static async Task FlushBatchAsync(
         IVectorCollection collection,
@@ -126,37 +138,38 @@ public static class Miner
         CancellationToken ct)
     {
         if (batch.Count == 0) return;
-        int n   = batch.Count;
+        var n = batch.Count;
         var now = DateTime.UtcNow.ToString("O");
-        var ids   = StringPool.Rent(n);
-        var docs  = StringPool.Rent(n);
+        var ids = StringPool.Rent(n);
+        var docs = StringPool.Rent(n);
         var metas = MetaPool.Rent(n);
         try
         {
-            for (int i = 0; i < n; i++)
+            for (var i = 0; i < n; i++)
             {
                 var c = batch[i];
-                ids[i]   = DrawerId(c.Wing, c.Room, c.SourceFile, c.ChunkIndex);
-                docs[i]  = c.Content;
+                ids[i] = DrawerId(c.Wing, c.Room, c.SourceFile, c.ChunkIndex);
+                docs[i] = c.Content;
                 metas[i] = new Dictionary<string, object?>(7)
                 {
-                    ["wing"]         = c.Wing,
-                    ["room"]         = c.Room,
-                    ["source_file"]  = c.SourceFile,
-                    ["chunk_index"]  = (long)c.ChunkIndex,
-                    ["added_by"]     = c.Agent,
-                    ["filed_at"]     = now,
-                    ["source_mtime"] = c.Mtime,
+                    ["wing"] = c.Wing,
+                    ["room"] = c.Room,
+                    ["source_file"] = c.SourceFile,
+                    ["chunk_index"] = (long)c.ChunkIndex,
+                    ["added_by"] = c.Agent,
+                    ["filed_at"] = now,
+                    ["source_mtime"] = c.Mtime
                 };
             }
+
             // UpsertAsync only reads [0..n), rented arrays may be larger — pass exact slices
             await collection.UpsertAsync(ids[..n], docs[..n], embedder, metas[..n], ct).ConfigureAwait(false);
         }
         finally
         {
-            StringPool.Return(ids, clearArray: true);
-            StringPool.Return(docs, clearArray: true);
-            MetaPool.Return(metas, clearArray: true);
+            StringPool.Return(ids, true);
+            StringPool.Return(docs, true);
+            MetaPool.Return(metas, true);
             batch.Clear();
         }
     }
@@ -173,9 +186,9 @@ public static class Miner
     {
         if (rooms.Count == 0) return "general";
 
-        var relative   = Path.GetRelativePath(projectPath, filePath).ToLowerInvariant();
-        var filename   = Path.GetFileNameWithoutExtension(filePath).ToLowerInvariant();
-        var pathParts  = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var relative = Path.GetRelativePath(projectPath, filePath).ToLowerInvariant();
+        var filename = Path.GetFileNameWithoutExtension(filePath).ToLowerInvariant();
+        var pathParts = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
         // 1. Folder path matches room name or keyword
         foreach (var room in rooms)
@@ -194,7 +207,8 @@ public static class Miner
 
         // 3. Content keyword scoring
         var scores = rooms
-            .Select(r => (Room: r, Score: r.Keywords.Count(k => content.Contains(k, StringComparison.OrdinalIgnoreCase))))
+            .Select(r => (Room: r,
+                Score: r.Keywords.Count(k => content.Contains(k, StringComparison.OrdinalIgnoreCase))))
             .Where(x => x.Score > 0)
             .OrderByDescending(x => x.Score)
             .FirstOrDefault();
@@ -229,21 +243,21 @@ public static class Miner
         projectDir = Path.GetFullPath(projectDir);
         var (wing, rooms) = ResolveWingAndRooms(projectDir, options);
         using var session = PalaceSession.Open(palacePath, backend: options.Backend);
-        var minedMtimes   = options.DryRun ? [] : session.Collection.LoadMinedMtimes();
-        var progress      = new MineProgress(projectDir);
+        var minedMtimes = options.DryRun ? [] : session.Collection.LoadMinedMtimes();
+        var progress = new MineProgress(projectDir);
 
         // Channel: producer writes batches, consumer embeds+writes
-        var channel = System.Threading.Channels.Channel.CreateBounded<(List<PendingChunk> batch, bool last)>(
-            new System.Threading.Channels.BoundedChannelOptions(4)
-            { SingleReader = true, SingleWriter = true, FullMode = System.Threading.Channels.BoundedChannelFullMode.Wait });
+        var channel = Channel.CreateBounded<(List<PendingChunk> batch, bool last)>(
+            new BoundedChannelOptions(4)
+                { SingleReader = true, SingleWriter = true, FullMode = BoundedChannelFullMode.Wait });
 
-        int skipped = 0;
+        var skipped = 0;
 
         // Producer: enumerate files, read, chunk, fill batches
         var producer = Task.Run(async () =>
         {
             var batch = new List<PendingChunk>(BatchSize);
-            int mined = 0;
+            var mined = 0;
 
             foreach (var file in EnumerateMineable(projectDir, options))
             {
@@ -254,7 +268,7 @@ public static class Miner
                     var currentMtime = PalaceSession.GetUnixMtime(file);
                     if (minedMtimes.TryGetValue(file, out var stored) && Math.Abs(stored - currentMtime) < 0.001)
                     {
-                        progress.File(file, skipped: true);
+                        progress.File(file, true);
                         Interlocked.Increment(ref skipped);
                         continue;
                     }
@@ -267,21 +281,31 @@ public static class Miner
                     var info = new FileInfo(file);
                     if (info.Length > Constants.MaxFileSize) continue;
                     fileMtime = (info.LastWriteTimeUtc - DateTime.UnixEpoch).TotalSeconds;
-                    content   = await File.ReadAllTextAsync(file, ct).ConfigureAwait(false);
+                    
+                    content = await File.ReadAllTextAsync(file, ct).ConfigureAwait(false);
                 }
-                catch { continue; }
+                catch
+                {
+                    continue;
+                }
 
                 if (string.IsNullOrWhiteSpace(content)) continue;
 
-                var room   = DetectRoom(file, content, rooms, projectDir);
+                var room = DetectRoom(file, content, rooms, projectDir);
                 var chunks = ChunkText(content);
-                progress.File(file, skipped: false);
+                progress.File(file, false);
 
                 foreach (var chunk in chunks)
                 {
-                    if (options.DryRun) { Console.WriteLine($"[dry-run] {wing}/{room} chunk {chunk.ChunkIndex}: {file}"); continue; }
+                    if (options.DryRun)
+                    {
+                        Console.WriteLine($"[dry-run] {wing}/{room} chunk {chunk.ChunkIndex}: {file}");
+                        continue;
+                    }
+
                     progress.Chunk();
-                    batch.Add(new PendingChunk(wing, room, chunk.Content, file, chunk.ChunkIndex, options.Agent, fileMtime));
+                    batch.Add(new PendingChunk(wing, room, chunk.Content, file, chunk.ChunkIndex, options.Agent,
+                        fileMtime));
                     if (batch.Count >= BatchSize)
                     {
                         await channel.Writer.WriteAsync((batch, false), ct).ConfigureAwait(false);
@@ -300,7 +324,7 @@ public static class Miner
         }, ct);
 
         // Consumer: embed + write batches as they arrive
-        int minedConsumer = 0;
+        var minedConsumer = 0;
         await foreach (var (batch, _) in channel.Reader.ReadAllAsync(ct))
         {
             await FlushBatchAsync(session.Collection, embedder, batch, ct).ConfigureAwait(false);
@@ -312,15 +336,16 @@ public static class Miner
         progress.Done(minedConsumer, skipped, wing);
     }
 
-    private static (string Wing, IReadOnlyList<RoomConfig> Rooms) ResolveWingAndRooms(string projectDir, MinerOptions options)
+    private static (string Wing, IReadOnlyList<RoomConfig> Rooms) ResolveWingAndRooms(string projectDir,
+        MinerOptions options)
     {
         var projectConfig = ProjectConfig.TryLoad(projectDir);
-        var wing  = options.WingOverride ?? projectConfig?.Wing ?? Path.GetFileName(projectDir);
-        var rooms = (IReadOnlyList<RoomConfig>)(projectConfig?.Rooms
-            ?? Constants.DefaultHallKeywords
-                .Select(kv => new RoomConfig(kv.Key, null, (IReadOnlyList<string>)kv.Value))
-                .Append(RoomConfig.General)
-                .ToList<RoomConfig>());
+        var wing = options.WingOverride ?? projectConfig?.Wing ?? Path.GetFileName(projectDir);
+        var rooms = projectConfig?.Rooms
+                    ?? Constants.DefaultHallKeywords
+                        .Select(kv => new RoomConfig(kv.Key, null, kv.Value))
+                        .Append(RoomConfig.General)
+                        .ToList<RoomConfig>();
         return (wing, rooms);
     }
 
@@ -340,10 +365,10 @@ public static class Miner
             ? new Dictionary<string, double>()
             : session.Collection.LoadMinedMtimes();
 
-        var files    = EnumerateMineable(projectDir, options);
-        int mined    = 0;
-        int skipped  = 0;
-        var batch    = new List<PendingChunk>(BatchSize);
+        var files = EnumerateMineable(projectDir, options);
+        var mined = 0;
+        var skipped = 0;
+        var batch = new List<PendingChunk>(BatchSize);
         var progress = new MineProgress(projectDir);
 
         foreach (var file in files)
@@ -356,7 +381,7 @@ public static class Miner
                 if (minedMtimes.TryGetValue(file, out var storedMtime) &&
                     Math.Abs(storedMtime - currentMtime) < 0.001)
                 {
-                    progress.File(file, skipped: true);
+                    progress.File(file, true);
                     skipped++;
                     continue;
                 }
@@ -369,16 +394,19 @@ public static class Miner
                 var info = new FileInfo(file);
                 if (info.Length > Constants.MaxFileSize) continue;
                 fileMtime = (info.LastWriteTimeUtc - DateTime.UnixEpoch).TotalSeconds;
-                content   = await File.ReadAllTextAsync(file, ct);
+                content = await File.ReadAllTextAsync(file, ct);
             }
-            catch { continue; }
+            catch
+            {
+                continue;
+            }
 
             if (string.IsNullOrWhiteSpace(content)) continue;
 
-            var room   = DetectRoom(file, content, rooms, projectDir);
+            var room = DetectRoom(file, content, rooms, projectDir);
             var chunks = ChunkText(content);
 
-            progress.File(file, skipped: false);
+            progress.File(file, false);
 
             foreach (var chunk in chunks)
             {
@@ -390,7 +418,8 @@ public static class Miner
                 }
 
                 progress.Chunk();
-                batch.Add(new PendingChunk(wing, room, chunk.Content, file, chunk.ChunkIndex, options.Agent, fileMtime));
+                batch.Add(new PendingChunk(wing, room, chunk.Content, file, chunk.ChunkIndex, options.Agent,
+                    fileMtime));
                 if (batch.Count >= BatchSize)
                 {
                     await FlushBatchAsync(session.Collection, embedder, batch, ct).ConfigureAwait(false);
@@ -429,16 +458,22 @@ public static class Miner
         string dir, string root, bool useGitignore,
         HashSet<string>? forceInclude)
     {
-        GitignoreMatcher? gitignore = useGitignore ? GitignoreMatcher.TryLoad(dir) : null;
+        var gitignore = useGitignore ? GitignoreMatcher.TryLoad(dir) : null;
 
         IEnumerable<string> entries;
-        try { entries = Directory.EnumerateFileSystemEntries(dir); }
-        catch { yield break; }
+        try
+        {
+            entries = Directory.EnumerateFileSystemEntries(dir);
+        }
+        catch
+        {
+            yield break;
+        }
 
         foreach (var entry in entries)
         {
             var name = Path.GetFileName(entry);
-            bool isDir = Directory.Exists(entry);
+            var isDir = Directory.Exists(entry);
 
             if (Constants.SkipDirs.Contains(name) && isDir) continue;
 
@@ -460,6 +495,15 @@ public static class Miner
             }
         }
     }
+
+    private record PendingChunk(
+        string Wing,
+        string Room,
+        string Content,
+        string SourceFile,
+        int ChunkIndex,
+        string Agent,
+        double Mtime);
 }
 
 // ---------------------------------------------------------------------------
@@ -474,7 +518,7 @@ internal sealed class GitignoreMatcher
     private GitignoreMatcher(string baseDir, IReadOnlyList<GitignoreRule> rules)
     {
         _baseDir = baseDir;
-        _rules   = rules;
+        _rules = rules;
     }
 
     public static GitignoreMatcher? TryLoad(string dir)
@@ -488,6 +532,7 @@ internal sealed class GitignoreMatcher
             var rule = GitignoreRule.TryParse(line);
             if (rule is not null) rules.Add(rule);
         }
+
         return rules.Count > 0 ? new GitignoreMatcher(dir, rules) : null;
     }
 
@@ -496,13 +541,14 @@ internal sealed class GitignoreMatcher
         var relative = Path.GetRelativePath(_baseDir, fullPath)
             .Replace(Path.DirectorySeparatorChar, '/');
 
-        bool ignored = false;
+        var ignored = false;
         foreach (var rule in _rules)
         {
             if (rule.DirOnly && !isDir) continue;
             if (rule.Matches(relative))
                 ignored = !rule.Negated;
         }
+
         return ignored;
     }
 }
@@ -511,25 +557,22 @@ internal sealed class GitignoreMatcher
 // Mining progress display
 // ---------------------------------------------------------------------------
 
-internal sealed class MineProgress
+internal sealed class MineProgress(string root)
 {
-    private static readonly string[] Spinner = ["⠋","⠙","⠚","⠞","⠖","⠦","⠴","⠲","⠳","⠵"];
+    private static readonly string[] Spinner = ["⠋", "⠙", "⠚", "⠞", "⠖", "⠦", "⠴", "⠲", "⠳", "⠵"];
     private static readonly bool IsTty = !Console.IsErrorRedirected;
 
-    private readonly System.Diagnostics.Stopwatch _sw = System.Diagnostics.Stopwatch.StartNew();
-    private readonly string _root;
-    private int _spin;
-    private int _files;
-    private int _skipped;
+    private readonly Stopwatch _sw = Stopwatch.StartNew();
     private int _chunks;
     private string _current = "";
-
-    public MineProgress(string root) => _root = root;
+    private int _files;
+    private int _skipped;
+    private int _spin;
 
     public void File(string path, bool skipped)
     {
         if (skipped) _skipped++;
-        else         _current = System.IO.Path.GetRelativePath(_root, path);
+        else _current = Path.GetRelativePath(root, path);
         Render();
     }
 
@@ -556,53 +599,60 @@ internal sealed class MineProgress
     private void Render()
     {
         if (!IsTty) return;
-        var rate   = _chunks / Math.Max(_sw.Elapsed.TotalSeconds, 0.001);
-        var spin   = Spinner[_spin];
+        var rate = _chunks / Math.Max(_sw.Elapsed.TotalSeconds, 0.001);
+        var spin = Spinner[_spin];
         var prefix = $"⛏  {spin}  {_files} files  {_skipped} skipped  {_chunks} chunks  {rate:0.#}/s  ";
-        var width  = Math.Max(40, Console.WindowWidth - 1);
+        var width = Math.Max(40, Console.WindowWidth - 1);
         var pathBudget = width - prefix.Length;
-        var path   = pathBudget > 3 && _current.Length > pathBudget
+        var path = pathBudget > 3 && _current.Length > pathBudget
             ? "…" + _current[^(pathBudget - 1)..]
             : _current;
-        var line   = prefix + path;
+        var line = prefix + path;
         Console.Error.Write($"\r{line.PadRight(width)[..width]}");
     }
 }
 
 internal sealed class GitignoreRule
 {
-    public bool Negated { get; }
-    public bool DirOnly { get; }
-    private readonly System.Text.RegularExpressions.Regex? _regex;
+    private readonly Regex? _regex;
 
     private GitignoreRule(string glob, bool negated, bool dirOnly, bool anchored)
     {
         Negated = negated;
         DirOnly = dirOnly;
 
-        var pattern = glob.Replace(".", "\\.").Replace("**", "\x00").Replace("*", "[^/]*").Replace("\x00", ".*").Replace("?", "[^/]");
+        var pattern = glob.Replace(".", "\\.").Replace("**", "\x00").Replace("*", "[^/]*").Replace("\x00", ".*")
+            .Replace("?", "[^/]");
         pattern = anchored
             ? "^" + pattern + "(/.*)?$"
             : "(^|.*/)(" + pattern + ")(/.*)?$";
 
-        try { _regex = new System.Text.RegularExpressions.Regex(pattern,
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase |
-                System.Text.RegularExpressions.RegexOptions.Compiled); }
-        catch (System.Text.RegularExpressions.RegexParseException) { }
+        try
+        {
+            _regex = new Regex(pattern,
+                RegexOptions.IgnoreCase |
+                RegexOptions.Compiled);
+        }
+        catch (RegexParseException)
+        {
+        }
     }
+
+    public bool Negated { get; }
+    public bool DirOnly { get; }
 
     public static GitignoreRule? TryParse(string line)
     {
         line = line.TrimEnd();
         if (string.IsNullOrEmpty(line) || line.StartsWith('#')) return null;
 
-        bool negated = line.StartsWith('!');
+        var negated = line.StartsWith('!');
         if (negated) line = line[1..];
 
-        bool dirOnly = line.EndsWith('/');
+        var dirOnly = line.EndsWith('/');
         if (dirOnly) line = line[..^1];
 
-        bool anchored = line.Contains('/');
+        var anchored = line.Contains('/');
         line = line.TrimStart('/');
 
         if (string.IsNullOrEmpty(line)) return null;
@@ -615,7 +665,7 @@ internal sealed class GitignoreRule
         {
             return _regex?.IsMatch(relative) ?? false;
         }
-        catch (System.Text.RegularExpressions.RegexParseException)
+        catch (RegexParseException)
         {
             return false;
         }

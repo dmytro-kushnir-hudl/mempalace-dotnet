@@ -1,4 +1,5 @@
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Order;
 using BenchmarkDotNet.Running;
 using Chroma.Embeddings;
 using Mempalace;
@@ -12,39 +13,21 @@ var summary = BenchmarkRunner.Run<VectorBackendBenchmarks>();
 // ── Benchmark class ───────────────────────────────────────────────────────────
 
 /// <summary>
-/// Compares SQLite and Chroma backends across the three hot-path operations:
-///   - UpsertAsync   (add a drawer)
-///   - SearchAsync   (semantic search)
-///   - Get           (metadata-filtered list)
-///
-/// Each operation is measured independently with a pre-warmed palace containing
-/// <see cref="WarmupDrawerCount"/> drawers so that search similarity is meaningful.
-///
-/// Run with:
-///   dotnet run -c Release --project benchmarks/Mempalace.Benchmarks/
+///     Compares SQLite and Chroma backends across the three hot-path operations:
+///     - UpsertAsync   (add a drawer)
+///     - SearchAsync   (semantic search)
+///     - Get           (metadata-filtered list)
+///     Each operation is measured independently with a pre-warmed palace containing
+///     <see cref="WarmupDrawerCount" /> drawers so that search similarity is meaningful.
+///     Run with:
+///     dotnet run -c Release --project benchmarks/Mempalace.Benchmarks/
 /// </summary>
 [ShortRunJob]
 [MemoryDiagnoser]
-[Orderer(BenchmarkDotNet.Order.SummaryOrderPolicy.FastestToSlowest)]
+[Orderer(SummaryOrderPolicy.FastestToSlowest)]
 [RankColumn]
 public class VectorBackendBenchmarks : IDisposable
 {
-    // ── Config ────────────────────────────────────────────────────────────────
-
-    /// <summary>Drawers inserted during Setup before benchmarks run.</summary>
-    [Params(50, 200)]
-    public int WarmupDrawerCount { get; set; }
-
-    // ── State ─────────────────────────────────────────────────────────────────
-
-    private DefaultEmbeddingProvider _embedder = null!;
-    private string _sqlitePalace = null!;
-    private string _chromaPalace = null!;
-    private int _upsertCounter;
-
-    // Pre-computed embedding for search benchmarks (avoids embedding cost in timed section)
-    private Embedding<float>? _queryEmbedding;
-
     private static readonly string[] SeedDocuments =
     [
         "We decided to use JWT tokens with RS256 signing for stateless verification across microservices.",
@@ -66,15 +49,37 @@ public class VectorBackendBenchmarks : IDisposable
         "Event sourcing is used for the order domain with EventStoreDB.",
         "The search service uses Elasticsearch with custom BM25 tuning.",
         "Caching strategy: write-through cache with Redis, TTL 5 minutes.",
-        "Dead-letter queue processing retries failed events up to 3 times.",
+        "Dead-letter queue processing retries failed events up to 3 times."
     ];
+
+    private string _chromaPalace = null!;
+
+    // ── State ─────────────────────────────────────────────────────────────────
+
+    private DefaultEmbeddingProvider _embedder = null!;
+
+    // Pre-computed embedding for search benchmarks (avoids embedding cost in timed section)
+    private Embedding<float>? _queryEmbedding;
+    private string _sqlitePalace = null!;
+
+    private int _upsertCounter;
+    // ── Config ────────────────────────────────────────────────────────────────
+
+    /// <summary>Drawers inserted during Setup before benchmarks run.</summary>
+    [Params(50, 200)]
+    public int WarmupDrawerCount { get; set; }
+
+    public void Dispose()
+    {
+        Cleanup();
+    }
 
     // ── Setup / Teardown ───────────────────────────────────────────────────────
 
     [GlobalSetup]
     public async Task Setup()
     {
-        _embedder     = await DefaultEmbeddingProvider.CreateAsync();
+        _embedder = await DefaultEmbeddingProvider.CreateAsync();
         _sqlitePalace = Path.Combine(Path.GetTempPath(), $"bench_sqlite_{Guid.NewGuid():N}");
         _chromaPalace = Path.Combine(Path.GetTempPath(), $"bench_chroma_{Guid.NewGuid():N}");
         Directory.CreateDirectory(_sqlitePalace);
@@ -92,11 +97,9 @@ public class VectorBackendBenchmarks : IDisposable
     public void Cleanup()
     {
         _embedder.Dispose();
-        if (Directory.Exists(_sqlitePalace)) Directory.Delete(_sqlitePalace, recursive: true);
-        if (Directory.Exists(_chromaPalace)) Directory.Delete(_chromaPalace, recursive: true);
+        if (Directory.Exists(_sqlitePalace)) Directory.Delete(_sqlitePalace, true);
+        if (Directory.Exists(_chromaPalace)) Directory.Delete(_chromaPalace, true);
     }
-
-    public void Dispose() => Cleanup();
 
     // ── Benchmarks ─────────────────────────────────────────────────────────────
 
@@ -124,7 +127,7 @@ public class VectorBackendBenchmarks : IDisposable
     public async Task<int> Sqlite_Search()
     {
         using var session = PalaceSession.Open(_sqlitePalace, backend: VectorBackend.Sqlite);
-        var results = await session.Collection.SearchAsync("auth JWT token", _embedder, nResults: 5);
+        var results = await session.Collection.SearchAsync("auth JWT token", _embedder, 5);
         return results.Length;
     }
 
@@ -132,7 +135,7 @@ public class VectorBackendBenchmarks : IDisposable
     public async Task<int> Chroma_Search()
     {
         using var session = PalaceSession.Open(_chromaPalace, backend: VectorBackend.Chroma);
-        var results = await session.Collection.SearchAsync("auth JWT token", _embedder, nResults: 5);
+        var results = await session.Collection.SearchAsync("auth JWT token", _embedder, 5);
         return results.Length;
     }
 
@@ -143,7 +146,7 @@ public class VectorBackendBenchmarks : IDisposable
     {
         using var session = PalaceSession.Open(_sqlitePalace, backend: VectorBackend.Sqlite);
         var filter = MetadataFilter.Where("wing", "backend");
-        return session.Collection.Get(filter: filter, limit: 100).Length;
+        return session.Collection.Get(filter, limit: 100).Length;
     }
 
     [Benchmark]
@@ -151,7 +154,7 @@ public class VectorBackendBenchmarks : IDisposable
     {
         using var session = PalaceSession.Open(_chromaPalace, backend: VectorBackend.Chroma);
         var filter = MetadataFilter.Where("wing", "backend");
-        return session.Collection.Get(filter: filter, limit: 100).Length;
+        return session.Collection.Get(filter, limit: 100).Length;
     }
 
     // ── Count ──────────────────────────────────────────────────────────────────
@@ -178,34 +181,34 @@ public class VectorBackendBenchmarks : IDisposable
         var wings = new[] { "backend", "frontend", "infra" };
         var rooms = new[] { "auth", "database", "api", "components", "config" };
 
-        var ids   = new string[WarmupDrawerCount];
-        var docs  = new string[WarmupDrawerCount];
+        var ids = new string[WarmupDrawerCount];
+        var docs = new string[WarmupDrawerCount];
         var metas = new Dictionary<string, object?>[WarmupDrawerCount];
 
-        for (int i = 0; i < WarmupDrawerCount; i++)
+        for (var i = 0; i < WarmupDrawerCount; i++)
         {
-            var doc  = SeedDocuments[i % SeedDocuments.Length] + $" (copy {i})";
+            var doc = SeedDocuments[i % SeedDocuments.Length] + $" (copy {i})";
             var wing = wings[i % wings.Length];
             var room = rooms[i % rooms.Length];
-            ids[i]   = $"bench_{wing}_{room}_{i:D4}";
-            docs[i]  = doc;
+            ids[i] = $"bench_{wing}_{room}_{i:D4}";
+            docs[i] = doc;
             metas[i] = new Dictionary<string, object?>
             {
-                ["wing"]        = wing,
-                ["room"]        = room,
+                ["wing"] = wing,
+                ["room"] = room,
                 ["source_file"] = "",
                 ["chunk_index"] = (long)i,
-                ["added_by"]    = "benchmark",
-                ["filed_at"]    = DateTime.UtcNow.ToString("O"),
+                ["added_by"] = "benchmark",
+                ["filed_at"] = DateTime.UtcNow.ToString("O")
             };
         }
 
         // Batch in groups of 50 to avoid embedding OOM on large counts
         const int BatchSize = 50;
-        for (int offset = 0; offset < WarmupDrawerCount; offset += BatchSize)
+        for (var offset = 0; offset < WarmupDrawerCount; offset += BatchSize)
         {
-            int end  = Math.Min(offset + BatchSize, WarmupDrawerCount);
-            int len  = end - offset;
+            var end = Math.Min(offset + BatchSize, WarmupDrawerCount);
+            var len = end - offset;
             await session.Collection.UpsertAsync(
                 ids[offset..end], docs[offset..end], _embedder,
                 metas[offset..end]);
@@ -214,19 +217,19 @@ public class VectorBackendBenchmarks : IDisposable
 
     private (string Id, string Doc, Dictionary<string, object?> Meta) NextDrawer()
     {
-        int n   = System.Threading.Interlocked.Increment(ref _upsertCounter);
+        var n = Interlocked.Increment(ref _upsertCounter);
         var doc = SeedDocuments[n % SeedDocuments.Length] + $" (bench insert {n})";
         return (
-            Id:  $"bench_new_{n:D8}",
+            Id: $"bench_new_{n:D8}",
             Doc: doc,
             Meta: new Dictionary<string, object?>
             {
-                ["wing"]        = "bench",
-                ["room"]        = "regression",
+                ["wing"] = "bench",
+                ["room"] = "regression",
                 ["source_file"] = "",
                 ["chunk_index"] = (long)n,
-                ["added_by"]    = "benchmark",
-                ["filed_at"]    = DateTime.UtcNow.ToString("O"),
+                ["added_by"] = "benchmark",
+                ["filed_at"] = DateTime.UtcNow.ToString("O")
             });
     }
 }

@@ -2,6 +2,14 @@ namespace Mempalace.Tests;
 
 public sealed class MinerTests
 {
+    // ── DetectRoom ────────────────────────────────────────────────────────────
+
+    private static readonly IReadOnlyList<RoomConfig> TestRooms =
+    [
+        new("backend", "API", ["api", "database"]),
+        new("frontend", "UI", ["react", "tsx", "css"]),
+        new("general", "Other", [])
+    ];
     // ── ChunkText ─────────────────────────────────────────────────────────────
 
     [Fact]
@@ -42,7 +50,7 @@ public sealed class MinerTests
         var content = string.Join("\n\n", Enumerable.Range(0, 20)
             .Select(i => new string('b', 60) + $" {i}"));
         var chunks = Miner.ChunkText(content);
-        for (int i = 0; i < chunks.Count; i++)
+        for (var i = 0; i < chunks.Count; i++)
             Assert.Equal(i, chunks[i].ChunkIndex);
     }
 
@@ -84,20 +92,11 @@ public sealed class MinerTests
     [Fact]
     public void DrawerId_HashSegment_Is24CharsLowerHex()
     {
-        var id   = Miner.DrawerId("w", "r", "/f", 0);
+        var id = Miner.DrawerId("w", "r", "/f", 0);
         var hash = id.Split('_').Last();
         Assert.Equal(24, hash.Length);
         Assert.Matches("^[0-9a-f]+$", hash);
     }
-
-    // ── DetectRoom ────────────────────────────────────────────────────────────
-
-    private static readonly IReadOnlyList<RoomConfig> TestRooms =
-    [
-        new RoomConfig("backend",  "API",   ["api", "database"]),
-        new RoomConfig("frontend", "UI",    ["react", "tsx", "css"]),
-        new RoomConfig("general",  "Other", []),
-    ];
 
     [Fact]
     public void DetectRoom_FolderMatchesRoomName_ReturnsRoom()

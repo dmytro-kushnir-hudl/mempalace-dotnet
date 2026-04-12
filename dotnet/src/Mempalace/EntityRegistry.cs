@@ -7,6 +7,11 @@ namespace Mempalace;
 // ---------------------------------------------------------------------------
 // EntityRegistry — port of entity_registry.py
 //
+// TODO: wire to `init` command (entity onboarding) and future spellcheck feature,
+//       matching Python behaviour: seeded during init, consulted by spellcheck to
+//       preserve known names (Riley, Max) from correction.
+//       See: mempalace/onboarding.py + mempalace/spellcheck.py for reference.
+//
 // Persistent personal entity registry. Knows Riley (person) vs ever (adverb).
 // Three sources in priority order: onboarding > learned > wiki-researched.
 //
@@ -14,16 +19,16 @@ namespace Mempalace;
 // ---------------------------------------------------------------------------
 
 public sealed record EntityLookupResult(
-    string Type,          // "person" | "project" | "concept" | "unknown"
+    string Type, // "person" | "project" | "concept" | "unknown"
     double Confidence,
-    string Source,        // "onboarding" | "learned" | "wiki" | "inferred" | "none"
+    string Source, // "onboarding" | "learned" | "wiki" | "inferred" | "none"
     string Name,
     IReadOnlyList<string> Context,
     bool NeedsDisambiguation,
     string? DisambiguatedBy = null);
 
 public sealed record WikiLookupResult(
-    string InferredType,  // "person" | "place" | "concept" | "ambiguous" | "unknown"
+    string InferredType, // "person" | "place" | "concept" | "ambiguous" | "unknown"
     double Confidence,
     string? WikiSummary,
     string? WikiTitle,
@@ -38,15 +43,15 @@ public sealed class EntityRegistry
     // ── Common English words that double as names ─────────────────────────────
 
     private static readonly HashSet<string> CommonEnglishWords =
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        new(StringComparer.OrdinalIgnoreCase)
         {
-            "ever","grace","will","bill","mark","april","may","june","joy","hope",
-            "faith","chance","chase","hunter","dash","flash","star","sky","river",
-            "brook","lane","art","clay","gil","nat","max","rex","ray","jay","rose",
-            "violet","lily","ivy","ash","reed","sage",
-            "monday","tuesday","wednesday","thursday","friday","saturday","sunday",
-            "january","february","march","july","august","september","october",
-            "november","december",
+            "ever", "grace", "will", "bill", "mark", "april", "may", "june", "joy", "hope",
+            "faith", "chance", "chase", "hunter", "dash", "flash", "star", "sky", "river",
+            "brook", "lane", "art", "clay", "gil", "nat", "max", "rex", "ray", "jay", "rose",
+            "violet", "lily", "ivy", "ash", "reed", "sage",
+            "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+            "january", "february", "march", "july", "august", "september", "october",
+            "november", "december"
         };
 
     // ── Context disambiguation patterns ───────────────────────────────────────
@@ -61,7 +66,7 @@ public sealed class EntityRegistry
         @"\bdrop(?:ped)?\s+(?:off\s+)?{0}\b",
         @"\b{0}(?:'s|s')\b", @"\bhey\s+{0}\b", @"\bthanks?\s+{0}\b",
         @"^{0}[:\s]",
-        @"\bmy\s+(?:son|daughter|kid|child|brother|sister|friend|partner|colleague|coworker)\s+{0}\b",
+        @"\bmy\s+(?:son|daughter|kid|child|brother|sister|friend|partner|colleague|coworker)\s+{0}\b"
     ];
 
     private static readonly string[] ConceptContextTemplates =
@@ -70,38 +75,65 @@ public sealed class EntityRegistry
         @"\b{0}\s+since\b", @"\b{0}\s+again\b", @"\bnot\s+{0}\b",
         @"\b{0}\s+more\b", @"\bwould\s+{0}\b", @"\bcould\s+{0}\b",
         @"\bwill\s+{0}\b",
-        @"(?:the\s+)?{0}\s+(?:of|in|at|for|to)\b",
+        @"(?:the\s+)?{0}\s+(?:of|in|at|for|to)\b"
     ];
 
     // ── Wikipedia name/place indicators ──────────────────────────────────────
 
     private static readonly string[] NameIndicatorPhrases =
     [
-        "given name","personal name","first name","forename",
-        "masculine name","feminine name","boy's name","girl's name",
-        "male name","female name","irish name","welsh name","scottish name",
-        "gaelic name","hebrew name","arabic name","norse name","old english name",
-        "is a name","as a name","name meaning","name derived from",
-        "legendary irish","legendary welsh","legendary scottish",
+        "given name", "personal name", "first name", "forename",
+        "masculine name", "feminine name", "boy's name", "girl's name",
+        "male name", "female name", "irish name", "welsh name", "scottish name",
+        "gaelic name", "hebrew name", "arabic name", "norse name", "old english name",
+        "is a name", "as a name", "name meaning", "name derived from",
+        "legendary irish", "legendary welsh", "legendary scottish"
     ];
 
     private static readonly string[] PlaceIndicatorPhrases =
     [
-        "city in","town in","village in","municipality","capital of",
-        "district of","county","province","region of","island of",
-        "mountain in","river in",
+        "city in", "town in", "village in", "municipality", "capital of",
+        "district of", "county", "province", "region of", "island of",
+        "mountain in", "river in"
     ];
+
+    // ── Wikipedia lookup ──────────────────────────────────────────────────────
+
+    private static readonly HttpClient _http = new();
 
     // ── State ─────────────────────────────────────────────────────────────────
 
     private readonly Dictionary<string, object?> _data;
     private readonly string _path;
 
+    static EntityRegistry()
+    {
+        _http.DefaultRequestHeaders.UserAgent.Add(
+            new ProductInfoHeaderValue("MemPalace", "1.0"));
+        _http.Timeout = TimeSpan.FromSeconds(5);
+    }
+
     private EntityRegistry(Dictionary<string, object?> data, string path)
     {
         _data = data;
         _path = path;
     }
+
+    // ── Properties ────────────────────────────────────────────────────────────
+
+    public string Mode => _data.GetValueOrDefault("mode") as string ?? "personal";
+
+    public IReadOnlyDictionary<string, object?> People =>
+        (_data.GetValueOrDefault("people") as Dictionary<string, object?>
+         ?? (_data.GetValueOrDefault("people") is JsonElement je
+             ? JsonSerializer.Deserialize<Dictionary<string, object?>>(je.GetRawText()) ?? []
+             : []))!;
+
+    public IReadOnlyList<string> Projects =>
+        GetStringList("projects");
+
+    public IReadOnlyList<string> AmbiguousFlags =>
+        GetStringList("ambiguous_flags");
 
     // ── Load / Save ───────────────────────────────────────────────────────────
 
@@ -112,16 +144,17 @@ public sealed class EntityRegistry
             : DefaultPath;
 
         if (File.Exists(path))
-        {
             try
             {
-                var raw  = File.ReadAllText(path);
+                var raw = File.ReadAllText(path);
                 var data = JsonSerializer.Deserialize<Dictionary<string, object?>>(raw,
                     Json.CaseInsensitive);
                 if (data is not null) return new EntityRegistry(data, path);
             }
-            catch { /* fall through to empty */ }
-        }
+            catch
+            {
+                /* fall through to empty */
+            }
 
         return new EntityRegistry(Empty(), path);
     }
@@ -135,31 +168,18 @@ public sealed class EntityRegistry
                 Json.Indented));
     }
 
-    private static Dictionary<string, object?> Empty() => new()
+    private static Dictionary<string, object?> Empty()
     {
-        ["version"]         = 1L,
-        ["mode"]            = "personal",
-        ["people"]          = new Dictionary<string, object?>(),
-        ["projects"]        = new List<object?>(),
-        ["ambiguous_flags"] = new List<object?>(),
-        ["wiki_cache"]      = new Dictionary<string, object?>(),
-    };
-
-    // ── Properties ────────────────────────────────────────────────────────────
-
-    public string Mode => _data.GetValueOrDefault("mode") as string ?? "personal";
-
-    public IReadOnlyDictionary<string, object?> People =>
-        (_data.GetValueOrDefault("people") as Dictionary<string, object?>
-        ?? (_data.GetValueOrDefault("people") is JsonElement je
-            ? JsonSerializer.Deserialize<Dictionary<string, object?>>(je.GetRawText()) ?? []
-            : []))!;
-
-    public IReadOnlyList<string> Projects =>
-        GetStringList("projects");
-
-    public IReadOnlyList<string> AmbiguousFlags =>
-        GetStringList("ambiguous_flags");
+        return new Dictionary<string, object?>
+        {
+            ["version"] = 1L,
+            ["mode"] = "personal",
+            ["people"] = new Dictionary<string, object?>(),
+            ["projects"] = new List<object?>(),
+            ["ambiguous_flags"] = new List<object?>(),
+            ["wiki_cache"] = new Dictionary<string, object?>()
+        };
+    }
 
     // ── Seed from onboarding ─────────────────────────────────────────────────
 
@@ -169,7 +189,7 @@ public sealed class EntityRegistry
         IEnumerable<string> projects,
         IReadOnlyDictionary<string, string>? aliases = null)
     {
-        _data["mode"]     = mode;
+        _data["mode"] = mode;
         _data["projects"] = projects.ToList<object?>();
 
         aliases ??= new Dictionary<string, string>();
@@ -184,26 +204,25 @@ public sealed class EntityRegistry
 
             peopleDict[n] = new Dictionary<string, object?>
             {
-                ["source"]       = "onboarding",
-                ["contexts"]     = new List<object?> { context },
-                ["aliases"]      = reverseAliases.TryGetValue(n, out var a)
-                                   ? new List<object?> { a } : new List<object?>(),
+                ["source"] = "onboarding",
+                ["contexts"] = new List<object?> { context },
+                ["aliases"] = reverseAliases.TryGetValue(n, out var a)
+                    ? new List<object?> { a }
+                    : new List<object?>(),
                 ["relationship"] = relationship,
-                ["confidence"]   = 1.0,
+                ["confidence"] = 1.0
             };
 
             if (reverseAliases.TryGetValue(n, out var alias))
-            {
                 peopleDict[alias] = new Dictionary<string, object?>
                 {
-                    ["source"]       = "onboarding",
-                    ["contexts"]     = new List<object?> { context },
-                    ["aliases"]      = new List<object?> { n },
+                    ["source"] = "onboarding",
+                    ["contexts"] = new List<object?> { context },
+                    ["aliases"] = new List<object?> { n },
                     ["relationship"] = relationship,
-                    ["confidence"]   = 1.0,
-                    ["canonical"]    = n,
+                    ["confidence"] = 1.0,
+                    ["canonical"] = n
                 };
-            }
         }
 
         _data["people"] = peopleDict;
@@ -262,17 +281,18 @@ public sealed class EntityRegistry
         {
             if (!string.Equals(word, cached, StringComparison.OrdinalIgnoreCase)) continue;
             var entry = AsDictionary(val);
-            if (entry.GetValueOrDefault("confirmed") is not true
-                && entry.GetValueOrDefault("confirmed") is not JsonElement je2
+            if ((entry.GetValueOrDefault("confirmed") is not true
+                 && entry.GetValueOrDefault("confirmed") is not JsonElement je2)
                 || (entry.GetValueOrDefault("confirmed") is JsonElement jeb
                     && !jeb.GetBoolean()))
             {
                 // Check confirmed flag more robustly
                 var confirmedRaw = entry.GetValueOrDefault("confirmed");
-                bool confirmed = confirmedRaw is true
-                    || (confirmedRaw is JsonElement jce && jce.GetBoolean());
+                var confirmed = confirmedRaw is true
+                                || (confirmedRaw is JsonElement jce && jce.GetBoolean());
                 if (!confirmed) continue;
             }
+
             return new EntityLookupResult(
                 entry.GetValueOrDefault("inferred_type") as string ?? "unknown",
                 AsDouble(entry.GetValueOrDefault("confidence"), 0.0),
@@ -297,7 +317,7 @@ public sealed class EntityRegistry
                 c.GetValueOrDefault("wiki_summary") as string,
                 c.GetValueOrDefault("wiki_title") as string,
                 c.GetValueOrDefault("note") as string,
-                autoConfirm || (c.GetValueOrDefault("confirmed") is true));
+                autoConfirm || c.GetValueOrDefault("confirmed") is true);
         }
 
         var result = await WikipediaLookupAsync(word, ct);
@@ -305,12 +325,12 @@ public sealed class EntityRegistry
         cache[word] = new Dictionary<string, object?>
         {
             ["inferred_type"] = result.InferredType,
-            ["confidence"]    = result.Confidence,
-            ["wiki_summary"]  = result.WikiSummary,
-            ["wiki_title"]    = result.WikiTitle,
-            ["note"]          = result.Note,
-            ["word"]          = word,
-            ["confirmed"]     = autoConfirm,
+            ["confidence"] = result.Confidence,
+            ["wiki_summary"] = result.WikiSummary,
+            ["wiki_title"] = result.WikiTitle,
+            ["note"] = result.Note,
+            ["word"] = word,
+            ["confirmed"] = autoConfirm
         };
         _data["wiki_cache"] = cache;
         Save();
@@ -326,7 +346,7 @@ public sealed class EntityRegistry
         if (cache.TryGetValue(word, out var val))
         {
             var entry = AsDictionaryMutable(val);
-            entry["confirmed"]      = true;
+            entry["confirmed"] = true;
             entry["confirmed_type"] = entityType;
             cache[word] = entry;
         }
@@ -336,11 +356,11 @@ public sealed class EntityRegistry
             var pd2 = GetOrCreatePeopleDict();
             pd2[word] = new Dictionary<string, object?>
             {
-                ["source"]       = "wiki",
-                ["contexts"]     = new List<object?> { context },
-                ["aliases"]      = new List<object?>(),
+                ["source"] = "wiki",
+                ["contexts"] = new List<object?> { context },
+                ["aliases"] = new List<object?>(),
                 ["relationship"] = relationship,
-                ["confidence"]   = 0.90,
+                ["confidence"] = 0.90
             };
             _data["people"] = pd2;
 
@@ -376,12 +396,12 @@ public sealed class EntityRegistry
 
             peopleDict[entity.Name] = new Dictionary<string, object?>
             {
-                ["source"]       = "learned",
-                ["contexts"]     = new List<object?> { Mode == "combo" ? "personal" : Mode },
-                ["aliases"]      = new List<object?>(),
+                ["source"] = "learned",
+                ["contexts"] = new List<object?> { Mode == "combo" ? "personal" : Mode },
+                ["aliases"] = new List<object?>(),
                 ["relationship"] = "",
-                ["confidence"]   = entity.Confidence,
-                ["seen_count"]   = (long)entity.Frequency,
+                ["confidence"] = entity.Confidence,
+                ["seen_count"] = (long)entity.Frequency
             };
 
             if (CommonEnglishWords.Contains(entity.Name))
@@ -408,18 +428,18 @@ public sealed class EntityRegistry
 
     public IReadOnlyList<string> ExtractPeopleFromQuery(string query)
     {
-        var found      = new List<string>();
+        var found = new List<string>();
         var peopleDict = GetOrCreatePeopleDict();
 
         foreach (var (canonical, val) in peopleDict)
         {
-            var info    = AsDictionary(val);
+            var info = AsDictionary(val);
             var aliases = GetStringListFromObj(info.GetValueOrDefault("aliases"));
 
             foreach (var name in aliases.Prepend(canonical))
             {
                 if (!Regex.IsMatch(query, $@"\b{Regex.Escape(name)}\b",
-                    RegexOptions.IgnoreCase))
+                        RegexOptions.IgnoreCase))
                     continue;
 
                 if (AmbiguousFlags.Any(f => f.Equals(name, StringComparison.OrdinalIgnoreCase)))
@@ -447,7 +467,7 @@ public sealed class EntityRegistry
 
         return capitals
             .Where(w => !CommonEnglishWords.Contains(w)
-                && Lookup(w).Type == "unknown")
+                        && Lookup(w).Type == "unknown")
             .ToList();
     }
 
@@ -456,30 +476,19 @@ public sealed class EntityRegistry
     public string Summary()
     {
         var peopleKeys = GetOrCreatePeopleDict().Keys.ToList();
-        var preview    = string.Join(", ", peopleKeys.Take(8));
+        var preview = string.Join(", ", peopleKeys.Take(8));
         if (peopleKeys.Count > 8) preview += "...";
 
         var projectsStr = Projects.Count > 0 ? string.Join(", ", Projects) : "(none)";
-        var flagsStr    = AmbiguousFlags.Count > 0 ? string.Join(", ", AmbiguousFlags) : "(none)";
+        var flagsStr = AmbiguousFlags.Count > 0 ? string.Join(", ", AmbiguousFlags) : "(none)";
 
         return $"""
-            Mode: {Mode}
-            People: {peopleKeys.Count} ({preview})
-            Projects: {projectsStr}
-            Ambiguous flags: {flagsStr}
-            Wiki cache: {GetOrCreateWikiCache().Count} entries
-            """;
-    }
-
-    // ── Wikipedia lookup ──────────────────────────────────────────────────────
-
-    private static readonly HttpClient _http = new();
-
-    static EntityRegistry()
-    {
-        _http.DefaultRequestHeaders.UserAgent.Add(
-            new ProductInfoHeaderValue("MemPalace", "1.0"));
-        _http.Timeout = TimeSpan.FromSeconds(5);
+                Mode: {Mode}
+                People: {peopleKeys.Count} ({preview})
+                Projects: {projectsStr}
+                Ambiguous flags: {flagsStr}
+                Wiki cache: {GetOrCreateWikiCache().Count} entries
+                """;
     }
 
     private static async Task<WikiLookupResult> WikipediaLookupAsync(
@@ -487,7 +496,7 @@ public sealed class EntityRegistry
     {
         try
         {
-            var url  = $"https://en.wikipedia.org/api/rest_v1/page/summary/{Uri.EscapeDataString(word)}";
+            var url = $"https://en.wikipedia.org/api/rest_v1/page/summary/{Uri.EscapeDataString(word)}";
             var resp = await _http.GetAsync(url, ct);
 
             if (!resp.IsSuccessStatusCode)
@@ -498,11 +507,11 @@ public sealed class EntityRegistry
                 return new WikiLookupResult("unknown", 0.0, null, null);
             }
 
-            var body    = await resp.Content.ReadAsStringAsync(ct);
-            var doc     = JsonNode.Parse(body);
-            var type    = doc?["type"]?.GetValue<string>() ?? "";
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            var doc = JsonNode.Parse(body);
+            var type = doc?["type"]?.GetValue<string>() ?? "";
             var extract = (doc?["extract"]?.GetValue<string>() ?? "").ToLowerInvariant();
-            var title   = doc?["title"]?.GetValue<string>() ?? word;
+            var title = doc?["title"]?.GetValue<string>() ?? word;
 
             if (type == "disambiguation")
             {
@@ -516,12 +525,13 @@ public sealed class EntityRegistry
             }
 
             var summary = extract[..Math.Min(200, extract.Length)];
-            var wl      = word.ToLowerInvariant();
+            var wl = word.ToLowerInvariant();
 
             if (NameIndicatorPhrases.Any(p => extract.Contains(p)))
             {
-                double conf = extract.Contains($"{wl} is a") || extract.Contains($"{wl} (name")
-                    ? 0.90 : 0.80;
+                var conf = extract.Contains($"{wl} is a") || extract.Contains($"{wl} (name")
+                    ? 0.90
+                    : 0.80;
                 return new WikiLookupResult("person", conf, summary, title);
             }
 
@@ -530,7 +540,10 @@ public sealed class EntityRegistry
 
             return new WikiLookupResult("concept", 0.60, summary, title);
         }
-        catch (OperationCanceledException) { throw; }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return new WikiLookupResult("unknown", 0.0, null, null);
@@ -545,11 +558,11 @@ public sealed class EntityRegistry
         var n = Regex.Escape(word.ToLowerInvariant());
         var ctx = context.ToLowerInvariant();
 
-        int personScore = PersonContextTemplates
+        var personScore = PersonContextTemplates
             .Count(t => Regex.IsMatch(ctx, string.Format(CultureInfo.InvariantCulture, t, n),
                 RegexOptions.IgnoreCase | RegexOptions.Multiline));
 
-        int conceptScore = ConceptContextTemplates
+        var conceptScore = ConceptContextTemplates
             .Count(t => Regex.IsMatch(ctx, string.Format(CultureInfo.InvariantCulture, t, n),
                 RegexOptions.IgnoreCase));
 
@@ -585,6 +598,7 @@ public sealed class EntityRegistry
             _data["people"] = parsed;
             return parsed;
         }
+
         var empty = new Dictionary<string, object?>();
         _data["people"] = empty;
         return empty;
@@ -601,6 +615,7 @@ public sealed class EntityRegistry
             _data["wiki_cache"] = parsed;
             return parsed;
         }
+
         var empty = new Dictionary<string, object?>();
         _data["wiki_cache"] = empty;
         return empty;
@@ -619,11 +634,15 @@ public sealed class EntityRegistry
         return [];
     }
 
-    private List<string> GetStringList(string key) =>
-        GetOrCreateStringList(key);
+    private List<string> GetStringList(string key)
+    {
+        return GetOrCreateStringList(key);
+    }
 
     private static Dictionary<string, object?> AsDictionary(object? val)
-        => AsDictionaryMutable(val);
+    {
+        return AsDictionaryMutable(val);
+    }
 
     private static Dictionary<string, object?> AsDictionaryMutable(object? val)
     {

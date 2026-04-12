@@ -30,7 +30,7 @@ public sealed class KnowledgeGraphTests : IDisposable
     public void AddEntity_Duplicate_DoesNotThrow()
     {
         _kg.AddEntity("Bob");
-        _kg.AddEntity("Bob");  // upsert — must not throw
+        _kg.AddEntity("Bob"); // upsert — must not throw
         Assert.Equal(1, _kg.Stats().Entities);
     }
 
@@ -60,7 +60,7 @@ public sealed class KnowledgeGraphTests : IDisposable
     [Fact]
     public void AddTriple_WithTemporalBounds_Stored()
     {
-        _kg.AddTriple("Alice", "works_at", "ACME", validFrom: "2020-01-01");
+        _kg.AddTriple("Alice", "works_at", "ACME", "2020-01-01");
         var triples = _kg.QueryEntity("Alice");
         Assert.Single(triples);
         Assert.Equal("2020-01-01", triples[0].ValidFrom);
@@ -80,8 +80,8 @@ public sealed class KnowledgeGraphTests : IDisposable
     [Fact]
     public void Invalidate_SetsValidTo()
     {
-        _kg.AddTriple("Max", "has_issue", "injury", validFrom: "2026-01-01");
-        _kg.Invalidate("Max", "has_issue", "injury", ended: "2026-03-01");
+        _kg.AddTriple("Max", "has_issue", "injury", "2026-01-01");
+        _kg.Invalidate("Max", "has_issue", "injury", "2026-03-01");
 
         var triples = _kg.QueryEntity("Max");
         Assert.Single(triples);
@@ -95,7 +95,7 @@ public sealed class KnowledgeGraphTests : IDisposable
     public void QueryEntity_Outgoing_ReturnsTriplesWhereSubject()
     {
         _kg.AddTriple("Alice", "parent_of", "Max");
-        _kg.AddTriple("Bob",   "friend_of", "Alice");
+        _kg.AddTriple("Bob", "friend_of", "Alice");
 
         var results = _kg.QueryEntity("Alice", direction: "outgoing");
         Assert.Single(results);
@@ -116,7 +116,7 @@ public sealed class KnowledgeGraphTests : IDisposable
     public void QueryEntity_Both_ReturnsBothDirections()
     {
         _kg.AddTriple("Alice", "parent_of", "Max");
-        _kg.AddTriple("Bob",   "friend_of", "Alice");
+        _kg.AddTriple("Bob", "friend_of", "Alice");
 
         var results = _kg.QueryEntity("Alice", direction: "both");
         Assert.Equal(2, results.Count);
@@ -125,11 +125,11 @@ public sealed class KnowledgeGraphTests : IDisposable
     [Fact]
     public void QueryEntity_AsOf_FiltersTemporally()
     {
-        _kg.AddTriple("Alice", "works_at", "ACME",  validFrom: "2020-01-01");
-        _kg.AddTriple("Alice", "works_at", "NewCo", validFrom: "2024-01-01");
+        _kg.AddTriple("Alice", "works_at", "ACME", "2020-01-01");
+        _kg.AddTriple("Alice", "works_at", "NewCo", "2024-01-01");
 
-        var in2021 = _kg.QueryEntity("Alice", asOf: "2021-06-01");
-        var in2025 = _kg.QueryEntity("Alice", asOf: "2025-01-01");
+        var in2021 = _kg.QueryEntity("Alice", "2021-06-01");
+        var in2025 = _kg.QueryEntity("Alice", "2025-01-01");
 
         // Only the ACME triple is valid in 2021
         Assert.Single(in2021);
@@ -166,7 +166,7 @@ public sealed class KnowledgeGraphTests : IDisposable
     public void Timeline_EntityFilter_ReturnsOnlyRelatedFacts()
     {
         _kg.AddTriple("Alice", "parent_of", "Max");
-        _kg.AddTriple("Bob",   "lives_in",  "Paris");
+        _kg.AddTriple("Bob", "lives_in", "Paris");
 
         var alice = _kg.Timeline("Alice");
         Assert.Single(alice);
@@ -199,14 +199,19 @@ public sealed class KnowledgeGraphTests : IDisposable
     // ── NormaliseName ─────────────────────────────────────────────────────────
 
     [Theory]
-    [InlineData("Alice Smith",  "alice_smith")]
-    [InlineData("child_of",     "child_of")]
-    [InlineData("O'Brien",      "obrien")]
-    [InlineData("  spaced  ",   "spaced")]
-    public void NormaliseName_MatchesPythonBehaviour(string input, string expected) =>
+    [InlineData("Alice Smith", "alice_smith")]
+    [InlineData("child_of", "child_of")]
+    [InlineData("O'Brien", "obrien")]
+    [InlineData("  spaced  ", "spaced")]
+    public void NormaliseName_MatchesPythonBehaviour(string input, string expected)
+    {
         Assert.Equal(expected, KnowledgeGraph.NormaliseName(input));
+    }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private static string NormalisedPredicate(string p) => KnowledgeGraph.NormaliseName(p);
+    private static string NormalisedPredicate(string p)
+    {
+        return KnowledgeGraph.NormaliseName(p);
+    }
 }

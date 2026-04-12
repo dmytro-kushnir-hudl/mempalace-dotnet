@@ -8,6 +8,11 @@ public sealed class T49_T52_DiaryTests(EmbedderFixture embedder) : IDisposable
 {
     private readonly PalaceFactory _factory = new(embedder.Embedder);
 
+    public void Dispose()
+    {
+        _factory.Dispose();
+    }
+
     [Theory]
     [InlineData(VectorBackend.Sqlite)]
     [InlineData(VectorBackend.Chroma)]
@@ -16,7 +21,11 @@ public sealed class T49_T52_DiaryTests(EmbedderFixture embedder) : IDisposable
         var (ctx, _) = _factory.CreateContext(backend);
         var s = await McpHarness.SessionAsync(ctx,
             McpHarness.Call(2, "mempalace_diary_write",
-                new { agent_name = "test-agent", entry = "0:???|regression_test|\"ran all 22 tools today\"|determ|DECISION", topic = "regression" }));
+                new
+                {
+                    agent_name = "test-agent",
+                    entry = "0:???|regression_test|\"ran all 22 tools today\"|determ|DECISION", topic = "regression"
+                }));
 
         var r = s.Result(2);
         Assert.True(r["success"]!.GetValue<bool>());
@@ -41,7 +50,7 @@ public sealed class T49_T52_DiaryTests(EmbedderFixture embedder) : IDisposable
 
         // Ordered by timestamp descending
         var timestamps = entries.Select(e => e!["timestamp"]!.GetValue<string>()).ToList();
-        for (int i = 1; i < timestamps.Count; i++)
+        for (var i = 1; i < timestamps.Count; i++)
             Assert.True(string.Compare(timestamps[i - 1], timestamps[i], StringComparison.Ordinal) >= 0);
     }
 
@@ -68,7 +77,7 @@ public sealed class T49_T52_DiaryTests(EmbedderFixture embedder) : IDisposable
 
         // Write 4 entries, read back 2
         var lines = new List<string>();
-        for (int i = 0; i < 4; i++)
+        for (var i = 0; i < 4; i++)
             lines.Add(McpHarness.Call(i + 2, "mempalace_diary_write",
                 new { agent_name = "test-agent", entry = $"entry {i}", topic = "test" }));
         lines.Add(McpHarness.Call(6, "mempalace_diary_read",
@@ -77,6 +86,4 @@ public sealed class T49_T52_DiaryTests(EmbedderFixture embedder) : IDisposable
         var s = await McpHarness.SessionAsync(ctx, [.. lines]);
         Assert.Equal(2, s.Result(6)["entries"]!.AsArray().Count);
     }
-
-    public void Dispose() => _factory.Dispose();
 }

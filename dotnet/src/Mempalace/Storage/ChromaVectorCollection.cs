@@ -1,25 +1,24 @@
 using System.Text.Json.Nodes;
 using Chroma;
-using Chroma.Embeddings;
 using Microsoft.Extensions.AI;
 
 namespace Mempalace.Storage;
 
 /// <summary>
-///     <see cref="IVectorCollection"/> adapter over the native Chroma C FFI client.
-///     Owns the <see cref="NativeChromaClient"/> lifetime.
+///     <see cref="IVectorCollection" /> adapter over the native Chroma C FFI client.
+///     Owns the <see cref="NativeChromaClient" /> lifetime.
 /// </summary>
 public sealed class ChromaVectorCollection : IVectorCollection
 {
     private readonly NativeChromaClient _client;
-    private readonly NativeCollection   _col;
+    private readonly NativeCollection _col;
     private bool _disposed;
 
     public ChromaVectorCollection(string palacePath, string collectionName)
     {
         Directory.CreateDirectory(palacePath);
         _client = new NativeChromaClient(palacePath);
-        _col    = _client.GetOrCreateCollection(collectionName);
+        _col = _client.GetOrCreateCollection(collectionName);
     }
 
     // ── Write ─────────────────────────────────────────────────────────────────
@@ -30,10 +29,19 @@ public sealed class ChromaVectorCollection : IVectorCollection
         IEmbeddingGenerator<string, Embedding<float>> embedder,
         Dictionary<string, object?>[]? metadatas = null,
         CancellationToken ct = default)
-        => _col.UpsertTextsAsync(ids, documents, embedder, metadatas, ct: ct);
+    {
+        return _col.UpsertTextsAsync(ids, documents, embedder, metadatas, ct: ct);
+    }
 
-    public void Delete(string[] ids)             => _col.Delete(ids: ids);
-    public void Delete(MetadataFilter filter)    => _col.Delete(where: ToJsonNode(filter));
+    public void Delete(string[] ids)
+    {
+        _col.Delete(ids);
+    }
+
+    public void Delete(MetadataFilter filter)
+    {
+        _col.Delete(where: ToJsonNode(filter));
+    }
 
     // ── Read ──────────────────────────────────────────────────────────────────
 
@@ -45,33 +53,34 @@ public sealed class ChromaVectorCollection : IVectorCollection
         CancellationToken ct = default)
     {
         var qr = await _col.QueryByTextAsync(
-            queryTexts: [query],
-            embedder: embedder,
-            nResults: (uint)Math.Max(1, nResults),
-            where: filter is null ? null : ToJsonNode(filter),
+            [query],
+            embedder,
+            (uint)Math.Max(1, nResults),
+            filter is null ? null : ToJsonNode(filter),
             include: [Include.Documents, Include.Metadatas, Include.Distances],
             ct: ct);
 
         if (qr.Ids.Length == 0) return [];
 
-        var ids   = qr.Ids[0];
-        var docs  = qr.Documents?[0] ?? [];
+        var ids = qr.Ids[0];
+        var docs = qr.Documents?[0] ?? [];
         var metas = qr.Metadatas?[0] ?? [];
         var dists = qr.Distances?[0] ?? [];
 
         var results = new VectorSearchResult[ids.Length];
-        for (int i = 0; i < ids.Length; i++)
+        for (var i = 0; i < ids.Length; i++)
         {
             var dist = i < dists.Length ? dists[i] ?? 0.0 : 0.0;
             // Chroma returns L2 distance. For L2-normalized unit vectors:
             // cosine_similarity = 1 - (L2² / 2), mapped to [0, 1] via clamp.
-            var similarity = Math.Max(0.0, Math.Min(1.0, 1.0 - (dist * dist / 2.0)));
+            var similarity = Math.Max(0.0, Math.Min(1.0, 1.0 - dist * dist / 2.0));
             results[i] = new VectorSearchResult(
-                Id:         ids[i],
-                Document:   i < docs.Length  ? docs[i]  : null,
-                Metadata:   i < metas.Length ? metas[i] : null,
-                Similarity: Math.Round(similarity, 6));
+                ids[i],
+                i < docs.Length ? docs[i] : null,
+                i < metas.Length ? metas[i] : null,
+                Math.Round(similarity, 6));
         }
+
         return results;
     }
 
@@ -87,17 +96,17 @@ public sealed class ChromaVectorCollection : IVectorCollection
 
         GetResult raw;
         if (ids is { Length: > 0 })
-            raw = _col.Get(ids: ids, include: include);
+            raw = _col.Get(ids, include: include);
         else
             raw = _col.Get(
-                where:  filter is null ? null : ToJsonNode(filter),
-                limit:  (uint)limit,
+                where: filter is null ? null : ToJsonNode(filter),
+                limit: (uint)limit,
                 offset: (uint)offset,
                 include: include);
 
         var n = raw.Ids.Length;
         var result = new VectorRecord[n];
-        for (int i = 0; i < n; i++)
+        for (var i = 0; i < n; i++)
             result[i] = new VectorRecord(
                 raw.Ids[i],
                 includeDocuments ? raw.Documents?[i] : null,
@@ -105,11 +114,14 @@ public sealed class ChromaVectorCollection : IVectorCollection
         return result;
     }
 
-    public int Count() => (int)_col.Count();
+    public int Count()
+    {
+        return _col.Count();
+    }
 
     public Dictionary<string, double> LoadMinedMtimes()
     {
-        var rows = _col.Get(include: [Chroma.Include.Metadatas], limit: int.MaxValue);
+        var rows = _col.Get(include: [Include.Metadatas], limit: int.MaxValue);
         var result = new Dictionary<string, double>(StringComparer.Ordinal);
         var metas = rows.Metadatas;
         if (metas is null) return result;
@@ -118,15 +130,24 @@ public sealed class ChromaVectorCollection : IVectorCollection
             if (meta is null) continue;
             if (!meta.TryGetValue("source_file", out var sf) || sf is not string path) continue;
             if (!meta.TryGetValue("source_mtime", out var mt)) continue;
-            var mtime = mt switch {
+            var mtime = mt switch
+            {
                 double d => d,
-                System.Text.Json.JsonElement je => je.GetDouble(),
+                JsonElement je => je.GetDouble(),
                 _ => Convert.ToDouble(mt, CultureInfo.InvariantCulture)
             };
             if (!result.TryGetValue(path, out var existing) || mtime > existing)
                 result[path] = mtime;
         }
+
         return result;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _client.Dispose();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -148,16 +169,9 @@ public sealed class ChromaVectorCollection : IVectorCollection
 
     private static Include[] BuildInclude(bool docs, bool metas)
     {
-        if (docs && metas)  return [Include.Documents, Include.Metadatas];
-        if (docs)           return [Include.Documents];
-        if (metas)          return [Include.Metadatas];
+        if (docs && metas) return [Include.Documents, Include.Metadatas];
+        if (docs) return [Include.Documents];
+        if (metas) return [Include.Metadatas];
         return [];
-    }
-
-    public void Dispose()
-    {
-        if (_disposed) return;
-        _disposed = true;
-        _client.Dispose();
     }
 }

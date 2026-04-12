@@ -15,9 +15,6 @@ public static class HooksCli
 {
     private const int SaveInterval = 15;
 
-    private static readonly string StateDir =
-        Path.Combine(Constants.DefaultConfigDir, "hook_state");
-
     private const string StopBlockReason =
         "AUTO-SAVE checkpoint. Save key topics, decisions, quotes, and code " +
         "from this session to your memory system. Organize into appropriate " +
@@ -31,15 +28,18 @@ public static class HooksCli
         "appropriate categories. Use verbatim quotes where possible. Save " +
         "everything, then allow compaction to proceed.";
 
+    private static readonly string StateDir =
+        Path.Combine(Constants.DefaultConfigDir, "hook_state");
+
     private static readonly HashSet<string> SupportedHarnesses =
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        { "claude-code", "codex" };
+        new(StringComparer.OrdinalIgnoreCase)
+            { "claude-code", "codex" };
 
     // ── Main entry ────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Read JSON from stdin, dispatch to the appropriate hook handler,
-    /// write JSON result to stdout.
+    ///     Read JSON from stdin, dispatch to the appropriate hook handler,
+    ///     write JSON result to stdout.
     /// </summary>
     public static async Task RunHookAsync(
         string hookName, string harness,
@@ -47,7 +47,7 @@ public static class HooksCli
         TextWriter? stdoutOverride = null,
         CancellationToken ct = default)
     {
-        var stdin  = stdinOverride ?? Console.In;
+        var stdin = stdinOverride ?? Console.In;
         var stdout = stdoutOverride ?? Console.Out;
 
         if (!SupportedHarnesses.Contains(harness))
@@ -105,32 +105,42 @@ public static class HooksCli
             return new JsonObject();
         }
 
-        int exchangeCount = CountHumanMessages(parsed.TranscriptPath);
+        var exchangeCount = CountHumanMessages(parsed.TranscriptPath);
 
         Directory.CreateDirectory(StateDir);
         var lastSaveFile = Path.Combine(StateDir, $"{parsed.SessionId}_last_save");
 
-        int lastSave = 0;
+        var lastSave = 0;
         if (File.Exists(lastSaveFile))
-        {
-            try { lastSave = int.Parse(File.ReadAllText(lastSaveFile).Trim(), CultureInfo.InvariantCulture); }
-            catch { lastSave = 0; }
-        }
+            try
+            {
+                lastSave = int.Parse(File.ReadAllText(lastSaveFile).Trim(), CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                lastSave = 0;
+            }
 
-        int sinceLast = exchangeCount - lastSave;
+        var sinceLast = exchangeCount - lastSave;
         Log($"Session {parsed.SessionId}: {exchangeCount} exchanges, {sinceLast} since last save");
 
         if (sinceLast >= SaveInterval && exchangeCount > 0)
         {
-            try { File.WriteAllText(lastSaveFile, exchangeCount.ToString(CultureInfo.InvariantCulture)); }
-            catch { /* best effort */ }
+            try
+            {
+                File.WriteAllText(lastSaveFile, exchangeCount.ToString(CultureInfo.InvariantCulture));
+            }
+            catch
+            {
+                /* best effort */
+            }
 
             Log($"TRIGGERING SAVE at exchange {exchangeCount}");
 
             return new JsonObject
             {
                 ["decision"] = "block",
-                ["reason"]   = StopBlockReason,
+                ["reason"] = StopBlockReason
             };
         }
 
@@ -144,7 +154,7 @@ public static class HooksCli
         return new JsonObject
         {
             ["decision"] = "block",
-            ["reason"]   = PrecompactBlockReason,
+            ["reason"] = PrecompactBlockReason
         };
     }
 
@@ -165,7 +175,7 @@ public static class HooksCli
         if (string.IsNullOrEmpty(transcriptPath) || !File.Exists(transcriptPath))
             return 0;
 
-        int count = 0;
+        var count = 0;
         try
         {
             foreach (var line in File.ReadLines(transcriptPath))
@@ -180,17 +190,23 @@ public static class HooksCli
                     var content = msg["content"];
                     if (content is null) continue;
 
-                    string text = content.GetValueKind() == System.Text.Json.JsonValueKind.String
+                    var text = content.GetValueKind() == JsonValueKind.String
                         ? content.GetValue<string>()
                         : string.Join(' ', content.AsArray()
                             .Select(b => b?["text"]?.GetValue<string>() ?? ""));
 
                     if (!text.Contains("<command-message>")) count++;
                 }
-                catch { /* skip malformed */ }
+                catch
+                {
+                    /* skip malformed */
+                }
             }
         }
-        catch { return 0; }
+        catch
+        {
+            return 0;
+        }
 
         return count;
     }
@@ -201,10 +217,13 @@ public static class HooksCli
         {
             Directory.CreateDirectory(StateDir);
             var logPath = Path.Combine(StateDir, "hook.log");
-            var ts      = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+            var ts = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
             File.AppendAllText(logPath, $"[{ts}] {message}{Environment.NewLine}");
         }
-        catch { /* best effort */ }
+        catch
+        {
+            /* best effort */
+        }
     }
 
     private static void Output(TextWriter writer, JsonObject data)

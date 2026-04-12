@@ -18,6 +18,48 @@ public static class Constants
     public const int MaxFileSize = 10 * 1024 * 1024; // 10 MB
     public const string DefaultCollectionName = "mempalace_drawers";
 
+    public static readonly IReadOnlySet<string> SkipDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ".git", "node_modules", "__pycache__", ".venv", "venv", "env",
+        "dist", "build", ".next", "coverage", ".mempalace", ".ruff_cache",
+        ".mypy_cache", ".pytest_cache", ".cache", ".tox", ".nox", ".idea",
+        ".vscode", ".ipynb_checkpoints", ".eggs", "htmlcov", "target",
+        "bin", "obj"
+    };
+
+    public static readonly IReadOnlySet<string> ReadableExtensions =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".txt", ".md", ".py", ".js", ".ts", ".jsx", ".tsx", ".json",
+            ".yaml", ".yml", ".html", ".css", ".java", ".go", ".rs", ".rb",
+            ".sh", ".csv", ".sql", ".toml", ".cs", ".fs", ".kt", ".swift",
+            ".cpp", ".c", ".h", ".hpp", ".csproj", ".fsproj", ".vbproj",
+            ".sln", ".slnx", ".props", ".targets"
+        };
+
+    public static readonly IReadOnlySet<string> SkipFilenames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "mempalace.yaml", "mempalace.yml", "mempal.yaml", "mempal.yml",
+        ".gitignore", "package-lock.json"
+    };
+
+    public static readonly IReadOnlyList<string> DefaultTopicWings = new[]
+    {
+        "emotions", "consciousness", "memory", "technical", "identity", "family", "creative"
+    };
+
+    public static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> DefaultHallKeywords =
+        new Dictionary<string, IReadOnlyList<string>>
+        {
+            ["emotions"] = ["scared", "afraid", "worried", "happy", "sad", "love", "hate", "feel", "feeling"],
+            ["consciousness"] = ["consciousness", "conscious", "aware", "real", "exist", "self", "mind"],
+            ["memory"] = ["remember", "forgot", "memory", "recall", "past", "history"],
+            ["technical"] = ["code", "bug", "function", "error", "api", "database", "deploy"],
+            ["identity"] = ["identity", "who am i", "purpose", "values", "belief", "role"],
+            ["family"] = ["family", "parent", "child", "sibling", "partner", "friend"],
+            ["creative"] = ["create", "art", "music", "write", "design", "imagine", "story"]
+        };
+
     public static string DefaultPalacePath =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             ".mempalace", "palace");
@@ -29,47 +71,6 @@ public static class Constants
     public static string DefaultConfigDir =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             ".mempalace");
-
-    public static readonly IReadOnlySet<string> SkipDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    {
-        ".git", "node_modules", "__pycache__", ".venv", "venv", "env",
-        "dist", "build", ".next", "coverage", ".mempalace", ".ruff_cache",
-        ".mypy_cache", ".pytest_cache", ".cache", ".tox", ".nox", ".idea",
-        ".vscode", ".ipynb_checkpoints", ".eggs", "htmlcov", "target",
-        "bin", "obj",
-    };
-
-    public static readonly IReadOnlySet<string> ReadableExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    {
-        ".txt", ".md", ".py", ".js", ".ts", ".jsx", ".tsx", ".json",
-        ".yaml", ".yml", ".html", ".css", ".java", ".go", ".rs", ".rb",
-        ".sh", ".csv", ".sql", ".toml", ".cs", ".fs", ".kt", ".swift",
-        ".cpp", ".c", ".h", ".hpp", ".csproj", ".fsproj", ".vbproj",
-        ".sln", ".slnx", ".props", ".targets",
-    };
-
-    public static readonly IReadOnlySet<string> SkipFilenames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    {
-        "mempalace.yaml", "mempalace.yml", "mempal.yaml", "mempal.yml",
-        ".gitignore", "package-lock.json",
-    };
-
-    public static readonly IReadOnlyList<string> DefaultTopicWings = new[]
-    {
-        "emotions", "consciousness", "memory", "technical", "identity", "family", "creative",
-    };
-
-    public static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> DefaultHallKeywords =
-        new Dictionary<string, IReadOnlyList<string>>
-        {
-            ["emotions"]      = ["scared", "afraid", "worried", "happy", "sad", "love", "hate", "feel", "feeling"],
-            ["consciousness"] = ["consciousness", "conscious", "aware", "real", "exist", "self", "mind"],
-            ["memory"]        = ["remember", "forgot", "memory", "recall", "past", "history"],
-            ["technical"]     = ["code", "bug", "function", "error", "api", "database", "deploy"],
-            ["identity"]      = ["identity", "who am i", "purpose", "values", "belief", "role"],
-            ["family"]        = ["family", "parent", "child", "sibling", "partner", "friend"],
-            ["creative"]      = ["create", "art", "music", "write", "design", "imagine", "story"],
-        };
 }
 
 // ---------------------------------------------------------------------------
@@ -114,8 +115,12 @@ public sealed class ProjectConfig
                 if (rooms.Count == 0) rooms.Add(RoomConfig.General);
                 return new ProjectConfig { Wing = raw.Wing ?? Path.GetFileName(projectDir), Rooms = rooms };
             }
-            catch { /* ignore malformed config */ }
+            catch
+            {
+                /* ignore malformed config */
+            }
         }
+
         return null;
     }
 
@@ -157,9 +162,12 @@ public sealed class MempalaceConfig
         {
             var json = File.ReadAllText(ConfigFilePath);
             return JsonSerializer.Deserialize<MempalaceConfig>(json, Json.CaseInsensitive)
-                ?? new MempalaceConfig();
+                   ?? new MempalaceConfig();
         }
-        catch { return new MempalaceConfig(); }
+        catch
+        {
+            return new MempalaceConfig();
+        }
     }
 }
 

@@ -1,5 +1,3 @@
-using System.Text.Json.Nodes;
-
 namespace Mempalace.Tests;
 
 public sealed class PalaceGraphTests
@@ -7,14 +5,16 @@ public sealed class PalaceGraphTests
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static Dictionary<string, object?> Meta(
-        string room, string wing, string hall = "", string date = "") =>
-        new()
+        string room, string wing, string hall = "", string date = "")
+    {
+        return new Dictionary<string, object?>
         {
             ["room"] = room,
             ["wing"] = wing,
             ["hall"] = hall,
-            ["date"] = date,
+            ["date"] = date
         };
+    }
 
     // ── BuildFromData — nodes ─────────────────────────────────────────────────
 
@@ -53,7 +53,7 @@ public sealed class PalaceGraphTests
         var data = new[]
         {
             new Dictionary<string, object?> { ["room"] = null, ["wing"] = "w" },
-            new Dictionary<string, object?> { ["room"] = "",   ["wing"] = "w" },
+            new Dictionary<string, object?> { ["room"] = "", ["wing"] = "w" }
         };
         var (nodes, _) = PalaceGraph.BuildFromData(data);
         Assert.Empty(nodes);
@@ -65,7 +65,7 @@ public sealed class PalaceGraphTests
         var data = new[]
         {
             new Dictionary<string, object?> { ["room"] = "auth", ["wing"] = null },
-            new Dictionary<string, object?> { ["room"] = "auth", ["wing"] = "" },
+            new Dictionary<string, object?> { ["room"] = "auth", ["wing"] = "" }
         };
         var (nodes, _) = PalaceGraph.BuildFromData(data);
         Assert.Empty(nodes);
@@ -74,7 +74,7 @@ public sealed class PalaceGraphTests
     [Fact]
     public void Build_NullMetadataEntrySkipped()
     {
-        var data = new Dictionary<string, object?>?[] { null, Meta("auth", "backend") };
+        var data = new[] { null, Meta("auth", "backend") };
         var (nodes, _) = PalaceGraph.BuildFromData(data);
         Assert.Single(nodes);
     }
@@ -94,7 +94,7 @@ public sealed class PalaceGraphTests
         {
             Meta("auth", "frontend"),
             Meta("auth", "backend"),
-            Meta("auth", "frontend"),
+            Meta("auth", "frontend")
         };
         var (nodes, _) = PalaceGraph.BuildFromData(data);
         var wings = nodes["auth"].Wings;
@@ -107,9 +107,9 @@ public sealed class PalaceGraphTests
     {
         var data = new[]
         {
-            Meta("auth", "backend", hall: "security"),
-            Meta("auth", "frontend", hall: "ux"),
-            Meta("auth", "backend", hall: "security"),
+            Meta("auth", "backend", "security"),
+            Meta("auth", "frontend", "ux"),
+            Meta("auth", "backend", "security")
         };
         var (nodes, _) = PalaceGraph.BuildFromData(data);
         var halls = nodes["auth"].Halls;
@@ -120,7 +120,7 @@ public sealed class PalaceGraphTests
     [Fact]
     public void Build_EmptyHallNotAdded()
     {
-        var data = new[] { Meta("auth", "backend", hall: "") };
+        var data = new[] { Meta("auth", "backend") };
         var (nodes, _) = PalaceGraph.BuildFromData(data);
         Assert.Empty(nodes["auth"].Halls);
     }
@@ -158,7 +158,7 @@ public sealed class PalaceGraphTests
         {
             Meta("auth", "backend"),
             Meta("auth", "frontend"),
-            Meta("auth", "mobile"),
+            Meta("auth", "mobile")
         };
         var (_, edges) = PalaceGraph.BuildFromData(data);
         // C(3,2) = 3 pairs × 1 hall (empty) = 3 edges
@@ -170,8 +170,8 @@ public sealed class PalaceGraphTests
     {
         var data = new[]
         {
-            Meta("auth", "backend",  hall: "sec"),
-            Meta("auth", "frontend", hall: "ux"),
+            Meta("auth", "backend", "sec"),
+            Meta("auth", "frontend", "ux")
         };
         var (_, edges) = PalaceGraph.BuildFromData(data);
         // 1 wing pair × 2 halls = 2 edges
@@ -180,12 +180,15 @@ public sealed class PalaceGraphTests
 
     // ── FindTunnels ────────────────────────────────────────────────────────────
 
-    private static IEnumerable<Dictionary<string, object?>> TunnelData() =>
-    [
-        Meta("auth",    "backend"),  Meta("auth",    "frontend"),
-        Meta("logging", "backend"),  Meta("logging", "infra"),
-        Meta("ui-kit",  "frontend"),                              // single-wing — not a tunnel
-    ];
+    private static IEnumerable<Dictionary<string, object?>> TunnelData()
+    {
+        return
+        [
+            Meta("auth", "backend"), Meta("auth", "frontend"),
+            Meta("logging", "backend"), Meta("logging", "infra"),
+            Meta("ui-kit", "frontend") // single-wing — not a tunnel
+        ];
+    }
 
     [Fact]
     public void FindTunnels_NoFilter_ReturnsOnlyMultiWingRooms()
@@ -200,7 +203,7 @@ public sealed class PalaceGraphTests
     [Fact]
     public void FindTunnels_WingAFilter_RestrictsResults()
     {
-        var tunnels = PalaceGraph.FindTunnels(TunnelData(), wingA: "frontend");
+        var tunnels = PalaceGraph.FindTunnels(TunnelData(), "frontend");
         Assert.All(tunnels, t => Assert.Contains("frontend", t.Wings));
         // logging is backend+infra — should not appear
         Assert.DoesNotContain("logging", tunnels.Select(t => t.Room));
@@ -209,7 +212,7 @@ public sealed class PalaceGraphTests
     [Fact]
     public void FindTunnels_BothWingsFilter_RequiresBoth()
     {
-        var tunnels = PalaceGraph.FindTunnels(TunnelData(), wingA: "backend", wingB: "infra");
+        var tunnels = PalaceGraph.FindTunnels(TunnelData(), "backend", "infra");
         Assert.Single(tunnels);
         Assert.Equal("logging", tunnels[0].Room);
     }
@@ -217,7 +220,7 @@ public sealed class PalaceGraphTests
     [Fact]
     public void FindTunnels_NoMatch_ReturnsEmpty()
     {
-        var tunnels = PalaceGraph.FindTunnels(TunnelData(), wingA: "nonexistent");
+        var tunnels = PalaceGraph.FindTunnels(TunnelData(), "nonexistent");
         Assert.Empty(tunnels);
     }
 
@@ -228,7 +231,7 @@ public sealed class PalaceGraphTests
         {
             Meta("a", "w1"), Meta("a", "w2"),
             Meta("b", "w1"), Meta("b", "w2"), Meta("b", "w3"),
-            Meta("b", "w1"), // extra count for b
+            Meta("b", "w1") // extra count for b
         };
         var tunnels = PalaceGraph.FindTunnels(data);
         Assert.Equal("b", tunnels[0].Room);
@@ -297,7 +300,7 @@ public sealed class PalaceGraphTests
     public void Traverse_MaxHopsZero_OnlyReturnsStartRoom()
     {
         var data = TunnelData();
-        var result = PalaceGraph.Traverse(data, "auth", maxHops: 0);
+        var result = PalaceGraph.Traverse(data, "auth", 0);
         var arr = result.AsArray();
         Assert.Single(arr);
     }
@@ -307,11 +310,11 @@ public sealed class PalaceGraphTests
     {
         var data = new[]
         {
-            Meta("auth",    "backend"),
-            Meta("auth",    "frontend"),
-            Meta("logging", "backend"),  // shares "backend" with auth
+            Meta("auth", "backend"),
+            Meta("auth", "frontend"),
+            Meta("logging", "backend") // shares "backend" with auth
         };
-        var result = PalaceGraph.Traverse(data, "auth", maxHops: 1);
+        var result = PalaceGraph.Traverse(data, "auth", 1);
         var arr = result.AsArray();
         var rooms = arr.Select(n => n!["room"]?.GetValue<string>()).ToHashSet();
         Assert.Contains("logging", rooms);
@@ -322,13 +325,13 @@ public sealed class PalaceGraphTests
     {
         var data = new[]
         {
-            Meta("auth",    "backend"),
-            Meta("auth",    "frontend"),
+            Meta("auth", "backend"),
+            Meta("auth", "frontend"),
             Meta("logging", "backend"),
             Meta("logging", "backend"), // count=2
-            Meta("metrics", "backend"),  // count=1
+            Meta("metrics", "backend") // count=1
         };
-        var result = PalaceGraph.Traverse(data, "auth", maxHops: 1);
+        var result = PalaceGraph.Traverse(data, "auth", 1);
         var arr = result.AsArray();
         // hop-1 entries: logging (count=2) before metrics (count=1)
         var hop1 = arr.Skip(1).Select(n => n!["room"]?.GetValue<string>()).ToList();

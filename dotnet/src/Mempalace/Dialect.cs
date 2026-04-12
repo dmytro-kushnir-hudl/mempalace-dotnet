@@ -22,7 +22,7 @@ public sealed class Dialect
     // ── Emotion codes ─────────────────────────────────────────────────────────
 
     private static readonly Dictionary<string, string> EmotionCodes =
-        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        new(StringComparer.OrdinalIgnoreCase)
         {
             ["vulnerability"] = "vul", ["vulnerable"] = "vul",
             ["joy"] = "joy", ["joyful"] = "joy",
@@ -52,11 +52,11 @@ public sealed class Dialect
             ["satisfaction"] = "satis",
             ["excitement"] = "excite",
             ["determination"] = "determ",
-            ["surprise"] = "surprise",
+            ["surprise"] = "surprise"
         };
 
     private static readonly Dictionary<string, string> EmotionSignals =
-        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        new(StringComparer.OrdinalIgnoreCase)
         {
             ["decided"] = "determ", ["prefer"] = "convict", ["worried"] = "anx",
             ["excited"] = "excite", ["frustrated"] = "frust", ["confused"] = "confuse",
@@ -65,11 +65,11 @@ public sealed class Dialect
             ["sad"] = "grief", ["surprised"] = "surprise", ["grateful"] = "grat",
             ["curious"] = "curious", ["wonder"] = "wonder", ["anxious"] = "anx",
             ["relieved"] = "relief", ["satisf"] = "satis",
-            ["disappoint"] = "grief", ["concern"] = "anx",
+            ["disappoint"] = "grief", ["concern"] = "anx"
         };
 
     private static readonly Dictionary<string, string> FlagSignals =
-        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        new(StringComparer.OrdinalIgnoreCase)
         {
             ["decided"] = "DECISION", ["chose"] = "DECISION",
             ["switched"] = "DECISION", ["migrated"] = "DECISION",
@@ -89,24 +89,24 @@ public sealed class Dialect
             ["architecture"] = "TECHNICAL", ["deploy"] = "TECHNICAL",
             ["infrastructure"] = "TECHNICAL", ["algorithm"] = "TECHNICAL",
             ["framework"] = "TECHNICAL", ["server"] = "TECHNICAL",
-            ["config"] = "TECHNICAL",
+            ["config"] = "TECHNICAL"
         };
 
-    private static readonly HashSet<string> StopWords = new HashSet<string>(
+    private static readonly HashSet<string> StopWords = new(
         StringComparer.OrdinalIgnoreCase)
     {
-        "the","a","an","is","are","was","were","be","been","being","have","has","had",
-        "do","does","did","will","would","could","should","may","might","shall","can",
-        "to","of","in","for","on","with","at","by","from","as","into","about",
-        "between","through","during","before","after","above","below","up","down",
-        "out","off","over","under","again","further","then","once","here","there",
-        "when","where","why","how","all","each","every","both","few","more","most",
-        "other","some","such","no","nor","not","only","own","same","so","than","too",
-        "very","just","don","now","and","but","or","if","while","that","this","these",
-        "those","it","its","i","we","you","he","she","they","me","him","her","us",
-        "them","my","your","his","our","their","what","which","who","whom","also",
-        "much","many","like","because","since","get","got","use","used","using",
-        "make","made","thing","things","way","well","really","want","need",
+        "the", "a", "an", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
+        "do", "does", "did", "will", "would", "could", "should", "may", "might", "shall", "can",
+        "to", "of", "in", "for", "on", "with", "at", "by", "from", "as", "into", "about",
+        "between", "through", "during", "before", "after", "above", "below", "up", "down",
+        "out", "off", "over", "under", "again", "further", "then", "once", "here", "there",
+        "when", "where", "why", "how", "all", "each", "every", "both", "few", "more", "most",
+        "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too",
+        "very", "just", "don", "now", "and", "but", "or", "if", "while", "that", "this", "these",
+        "those", "it", "its", "i", "we", "you", "he", "she", "they", "me", "him", "her", "us",
+        "them", "my", "your", "his", "our", "their", "what", "which", "who", "whom", "also",
+        "much", "many", "like", "because", "since", "get", "got", "use", "used", "using",
+        "make", "made", "thing", "things", "way", "well", "really", "want", "need"
     };
 
     // ── Compiled regex ────────────────────────────────────────────────────────
@@ -134,7 +134,7 @@ public sealed class Dialect
             foreach (var (k, v) in entities)
                 _entityCodes[k] = v;
         _skipNames = skipNames?.Select(n => n.ToLowerInvariant()).ToList()
-            ?? (IReadOnlyList<string>)[];
+                     ?? (IReadOnlyList<string>)[];
     }
 
     // ── Entity encoding ───────────────────────────────────────────────────────
@@ -145,7 +145,8 @@ public sealed class Dialect
         if (_entityCodes.TryGetValue(name, out var code)) return code;
         // Prefix/substring match
         foreach (var (key, val) in _entityCodes)
-            if (name.Contains(key, StringComparison.OrdinalIgnoreCase)) return val;
+            if (name.Contains(key, StringComparison.OrdinalIgnoreCase))
+                return val;
         // Auto-code: first 3 chars uppercase
         return name[..Math.Min(3, name.Length)].ToUpperInvariant();
     }
@@ -156,49 +157,52 @@ public sealed class Dialect
         foreach (var e in emotions)
         {
             var code = EmotionCodes.TryGetValue(e, out var c)
-                ? c : e[..Math.Min(4, e.Length)];
+                ? c
+                : e[..Math.Min(4, e.Length)];
             if (!codes.Contains(code)) codes.Add(code);
         }
+
         return string.Join('+', codes.Take(3));
     }
 
     // ── Plain text compression ────────────────────────────────────────────────
 
     /// <summary>
-    /// Lossy summarization of plain text into AAAK format.
-    /// Extracts entities, topics, key sentence, emotions, and flags.
+    ///     Lossy summarization of plain text into AAAK format.
+    ///     Extracts entities, topics, key sentence, emotions, and flags.
     /// </summary>
     public string Compress(string text, IReadOnlyDictionary<string, string>? metadata = null)
     {
         metadata ??= new Dictionary<string, string>();
 
-        var entities  = DetectEntitiesInText(text);
+        var entities = DetectEntitiesInText(text);
         var entityStr = entities.Count > 0 ? string.Join('+', entities.Take(3)) : "???";
 
-        var topics   = ExtractTopics(text);
+        var topics = ExtractTopics(text);
         var topicStr = topics.Count > 0 ? string.Join('_', topics.Take(3)) : "misc";
 
-        var quote     = ExtractKeySentence(text);
+        var quote = ExtractKeySentence(text);
         var quotePart = quote.Length > 0 ? $"\"{quote}\"" : "";
 
-        var emotions  = DetectEmotions(text);
+        var emotions = DetectEmotions(text);
         var emotionStr = emotions.Count > 0 ? string.Join('+', emotions) : "";
 
-        var flags    = DetectFlags(text);
-        var flagStr  = flags.Count > 0 ? string.Join('+', flags) : "";
+        var flags = DetectFlags(text);
+        var flagStr = flags.Count > 0 ? string.Join('+', flags) : "";
 
         var sb = new StringBuilder();
 
         // Header line
         var source = metadata.GetValueOrDefault("source_file", "");
-        var wing   = metadata.GetValueOrDefault("wing", "");
-        var room   = metadata.GetValueOrDefault("room", "");
-        var date   = metadata.GetValueOrDefault("date", "");
+        var wing = metadata.GetValueOrDefault("wing", "");
+        var room = metadata.GetValueOrDefault("room", "");
+        var date = metadata.GetValueOrDefault("date", "");
 
         if (source.Length > 0 || wing.Length > 0)
         {
             var stem = source.Length > 0 ? Path.GetFileNameWithoutExtension(source) : "?";
-            sb.AppendLine(CultureInfo.InvariantCulture, $"{(wing.Length > 0 ? wing : "?")}|{(room.Length > 0 ? room : "?")}|{(date.Length > 0 ? date : "?")}|{stem}");
+            sb.AppendLine(CultureInfo.InvariantCulture,
+                $"{(wing.Length > 0 ? wing : "?")}|{(room.Length > 0 ? room : "?")}|{(date.Length > 0 ? date : "?")}|{stem}");
         }
 
         // Content line
@@ -216,30 +220,34 @@ public sealed class Dialect
     /// <summary>Parse an AAAK string back into a structured summary.</summary>
     public static AaakDecoded Decode(string dialectText)
     {
-        var lines   = dialectText.Trim().Split('\n');
-        var header  = new Dictionary<string, string>();
-        var arc     = "";
+        var lines = dialectText.Trim().Split('\n');
+        var header = new Dictionary<string, string>();
+        var arc = "";
         var zettels = new List<string>();
         var tunnels = new List<string>();
 
         foreach (var line in lines)
-        {
             if (line.StartsWith("ARC:", StringComparison.Ordinal))
+            {
                 arc = line[4..];
+            }
             else if (line.StartsWith("T:", StringComparison.Ordinal))
+            {
                 tunnels.Add(line);
+            }
             else if (line.Contains('|') && line.Contains(':')
-                     && line.Split('|')[0].Contains(':'))
+                                        && line.Split('|')[0].Contains(':'))
+            {
                 zettels.Add(line);
+            }
             else if (line.Contains('|'))
             {
                 var parts = line.Split('|');
-                header["file"]     = parts.Length > 0 ? parts[0] : "";
+                header["file"] = parts.Length > 0 ? parts[0] : "";
                 header["entities"] = parts.Length > 1 ? parts[1] : "";
-                header["date"]     = parts.Length > 2 ? parts[2] : "";
-                header["title"]    = parts.Length > 3 ? parts[3] : "";
+                header["date"] = parts.Length > 2 ? parts[2] : "";
+                header["title"] = parts.Length > 3 ? parts[3] : "";
             }
-        }
 
         return new AaakDecoded(header, arc, zettels, tunnels);
     }
@@ -252,20 +260,23 @@ public sealed class Dialect
         return Math.Max(1, (int)(words.Length * 1.3));
     }
 
-    public static CompressionStats GetCompressionStats(string original, string compressed) => new(
-        CountTokens(original),
-        CountTokens(compressed),
-        Math.Round((double)CountTokens(original) / Math.Max(CountTokens(compressed), 1), 1),
-        original.Length,
-        compressed.Length);
+    public static CompressionStats GetCompressionStats(string original, string compressed)
+    {
+        return new CompressionStats(
+            CountTokens(original),
+            CountTokens(compressed),
+            Math.Round((double)CountTokens(original) / Math.Max(CountTokens(compressed), 1), 1),
+            original.Length,
+            compressed.Length);
+    }
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private static List<string> DetectEmotions(string text)
     {
-        var lower   = text.ToLowerInvariant();
-        var found   = new List<string>();
-        var seen    = new HashSet<string>();
+        var lower = text.ToLowerInvariant();
+        var found = new List<string>();
+        var seen = new HashSet<string>();
 
         foreach (var (kw, code) in EmotionSignals)
             if (lower.Contains(kw) && seen.Add(code))
@@ -278,7 +289,7 @@ public sealed class Dialect
     {
         var lower = text.ToLowerInvariant();
         var found = new List<string>();
-        var seen  = new HashSet<string>();
+        var seen = new HashSet<string>();
 
         foreach (var (kw, flag) in FlagSignals)
             if (lower.Contains(kw) && seen.Add(flag))
@@ -301,12 +312,12 @@ public sealed class Dialect
         // Boost proper nouns and technical terms
         foreach (Match m in WordRx.Matches(text))
         {
-            var orig  = m.Value;
+            var orig = m.Value;
             var lower = orig.ToLowerInvariant();
             if (StopWords.Contains(lower)) continue;
             if (char.IsUpper(orig[0]) && freq.ContainsKey(lower)) freq[lower] += 2;
             if ((orig.Contains('_') || orig.Contains('-')
-                 || orig[1..].Any(char.IsUpper)) && freq.ContainsKey(lower))
+                                    || orig[1..].Any(char.IsUpper)) && freq.ContainsKey(lower))
                 freq[lower] += 2;
         }
 
@@ -325,24 +336,25 @@ public sealed class Dialect
 
         var decisionWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "decided","because","instead","prefer","switched","chose","realized",
-            "important","key","critical","discovered","learned","conclusion",
-            "solution","reason","why","breakthrough","insight",
+            "decided", "because", "instead", "prefer", "switched", "chose", "realized",
+            "important", "key", "critical", "discovered", "learned", "conclusion",
+            "solution", "reason", "why", "breakthrough", "insight"
         };
 
         var scored = sentences.Select(s =>
-        {
-            int score = 0;
-            var sl = s.ToLowerInvariant();
-            foreach (var w in decisionWords)
-                if (sl.Contains(w)) score += 2;
-            if (s.Length < 80) score++;
-            if (s.Length < 40) score++;
-            if (s.Length > 150) score -= 2;
-            return (Score: score, Sentence: s);
-        })
-        .OrderByDescending(x => x.Score)
-        .First().Sentence;
+            {
+                var score = 0;
+                var sl = s.ToLowerInvariant();
+                foreach (var w in decisionWords)
+                    if (sl.Contains(w))
+                        score += 2;
+                if (s.Length < 80) score++;
+                if (s.Length < 40) score++;
+                if (s.Length > 150) score -= 2;
+                return (Score: score, Sentence: s);
+            })
+            .OrderByDescending(x => x.Score)
+            .First().Sentence;
 
         return scored.Length > 55 ? scored[..52] + "..." : scored;
     }
@@ -362,12 +374,12 @@ public sealed class Dialect
 
         // Fallback: capitalized mid-sentence words
         var words = text.Split(' ');
-        for (int i = 1; i < words.Length && found.Count < 3; i++)
+        for (var i = 1; i < words.Length && found.Count < 3; i++)
         {
             var clean = Regex.Replace(words[i], @"[^a-zA-Z]", "");
             if (clean.Length >= 2 && char.IsUpper(clean[0])
-                && clean[1..].All(char.IsLower)
-                && !StopWords.Contains(clean.ToLowerInvariant()))
+                                  && clean[1..].All(char.IsLower)
+                                  && !StopWords.Contains(clean.ToLowerInvariant()))
             {
                 var code = clean[..Math.Min(3, clean.Length)].ToUpperInvariant();
                 if (!found.Contains(code)) found.Add(code);

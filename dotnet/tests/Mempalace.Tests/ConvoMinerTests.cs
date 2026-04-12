@@ -4,25 +4,43 @@ public sealed class ConvoMinerTests
 {
     // ── DetectFormat ──────────────────────────────────────────────────────────
 
-    [Fact] public void DetectFormat_JsonlFile_ReturnsClaudeCodeJsonl() =>
+    [Fact]
+    public void DetectFormat_JsonlFile_ReturnsClaudeCodeJsonl()
+    {
         Assert.Equal(ConvoFormat.ClaudeCodeJsonl, ConvoMiner.DetectFormat("", "chat.jsonl"));
+    }
 
-    [Fact] public void DetectFormat_CodexJsonl_ReturnsCodexJsonl() =>
+    [Fact]
+    public void DetectFormat_CodexJsonl_ReturnsCodexJsonl()
+    {
         Assert.Equal(ConvoFormat.CodexJsonl,
             ConvoMiner.DetectFormat("{\"type\":\"session_meta\"}", "session.jsonl"));
+    }
 
-    [Fact] public void DetectFormat_JsonArrayFile_ReturnsClaudeAiJson() =>
+    [Fact]
+    public void DetectFormat_JsonArrayFile_ReturnsClaudeAiJson()
+    {
         Assert.Equal(ConvoFormat.ClaudeAiJson, ConvoMiner.DetectFormat("[{}]", "export.json"));
+    }
 
-    [Fact] public void DetectFormat_SlackJsonArray_ReturnsSlackJson() =>
+    [Fact]
+    public void DetectFormat_SlackJsonArray_ReturnsSlackJson()
+    {
         Assert.Equal(ConvoFormat.SlackJson,
             ConvoMiner.DetectFormat("[{\"type\":\"message\",\"user\":\"U1\",\"text\":\"hi\"}]", "channel.json"));
+    }
 
-    [Fact] public void DetectFormat_ChatGptJson_ReturnsChatGptJson() =>
+    [Fact]
+    public void DetectFormat_ChatGptJson_ReturnsChatGptJson()
+    {
         Assert.Equal(ConvoFormat.ChatGptJson, ConvoMiner.DetectFormat("{\"mapping\":{}}", "c.json"));
+    }
 
-    [Fact] public void DetectFormat_PlainText_ReturnsPlainText() =>
+    [Fact]
+    public void DetectFormat_PlainText_ReturnsPlainText()
+    {
         Assert.Equal(ConvoFormat.PlainText, ConvoMiner.DetectFormat("hello", "chat.txt"));
+    }
 
     // ── NormalizeToTranscript ─────────────────────────────────────────────────
 
@@ -38,9 +56,9 @@ public sealed class ConvoMinerTests
     public void Normalize_JsonlFormat_ExtractsRolesAsQuoteMarkers()
     {
         var jsonl = """
-            {"role":"user","content":"Hello"}
-            {"role":"assistant","content":"Hi there"}
-            """;
+                    {"role":"user","content":"Hello"}
+                    {"role":"assistant","content":"Hi there"}
+                    """;
         var result = ConvoMiner.NormalizeToTranscript(jsonl, ConvoFormat.ClaudeCodeJsonl);
         Assert.Contains("> Hello", result);
         Assert.Contains("Hi there", result);
@@ -66,10 +84,10 @@ public sealed class ConvoMinerTests
     public void Normalize_CodexJsonl_ExtractsUserAndAgentMessages()
     {
         var jsonl = """
-            {"type":"session_meta","session_id":"abc"}
-            {"type":"event_msg","payload":{"type":"user_message","message":"Hello codex"}}
-            {"type":"event_msg","payload":{"type":"agent_message","message":"Hi from agent"}}
-            """;
+                    {"type":"session_meta","session_id":"abc"}
+                    {"type":"event_msg","payload":{"type":"user_message","message":"Hello codex"}}
+                    {"type":"event_msg","payload":{"type":"agent_message","message":"Hi from agent"}}
+                    """;
         var result = ConvoMiner.NormalizeToTranscript(jsonl, ConvoFormat.CodexJsonl);
         Assert.Contains("> Hello codex", result);
         Assert.Contains("Hi from agent", result);
@@ -80,9 +98,9 @@ public sealed class ConvoMinerTests
     {
         // No session_meta line → not a valid Codex session, return as-is
         var jsonl = """
-            {"type":"event_msg","payload":{"type":"user_message","message":"hello"}}
-            {"type":"event_msg","payload":{"type":"agent_message","message":"world"}}
-            """;
+                    {"type":"event_msg","payload":{"type":"user_message","message":"hello"}}
+                    {"type":"event_msg","payload":{"type":"agent_message","message":"world"}}
+                    """;
         var result = ConvoMiner.NormalizeToTranscript(jsonl, ConvoFormat.CodexJsonl);
         Assert.Equal(jsonl, result);
     }
@@ -91,11 +109,11 @@ public sealed class ConvoMinerTests
     public void Normalize_CodexJsonl_SkipsNonEventMsgEntries()
     {
         var jsonl = """
-            {"type":"session_meta"}
-            {"type":"tool_call","payload":{"type":"user_message","message":"ignored"}}
-            {"type":"event_msg","payload":{"type":"user_message","message":"kept"}}
-            {"type":"event_msg","payload":{"type":"agent_message","message":"reply"}}
-            """;
+                    {"type":"session_meta"}
+                    {"type":"tool_call","payload":{"type":"user_message","message":"ignored"}}
+                    {"type":"event_msg","payload":{"type":"user_message","message":"kept"}}
+                    {"type":"event_msg","payload":{"type":"agent_message","message":"reply"}}
+                    """;
         var result = ConvoMiner.NormalizeToTranscript(jsonl, ConvoFormat.CodexJsonl);
         Assert.DoesNotContain("ignored", result);
         Assert.Contains("> kept", result);
@@ -105,11 +123,11 @@ public sealed class ConvoMinerTests
     public void Normalize_CodexJsonl_SkipsEmptyMessages()
     {
         var jsonl = """
-            {"type":"session_meta"}
-            {"type":"event_msg","payload":{"type":"user_message","message":"  "}}
-            {"type":"event_msg","payload":{"type":"user_message","message":"real question"}}
-            {"type":"event_msg","payload":{"type":"agent_message","message":"real answer"}}
-            """;
+                    {"type":"session_meta"}
+                    {"type":"event_msg","payload":{"type":"user_message","message":"  "}}
+                    {"type":"event_msg","payload":{"type":"user_message","message":"real question"}}
+                    {"type":"event_msg","payload":{"type":"agent_message","message":"real answer"}}
+                    """;
         var result = ConvoMiner.NormalizeToTranscript(jsonl, ConvoFormat.CodexJsonl);
         var lines = result.Split('\n').Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
         // Only the non-empty user + agent lines should appear
@@ -120,11 +138,11 @@ public sealed class ConvoMinerTests
     public void Normalize_SlackJson_ExtractsMessages()
     {
         var json = """
-            [
-              {"type":"message","user":"U1","text":"Hello team"},
-              {"type":"message","user":"U2","text":"Hey there"}
-            ]
-            """;
+                   [
+                     {"type":"message","user":"U1","text":"Hello team"},
+                     {"type":"message","user":"U2","text":"Hey there"}
+                   ]
+                   """;
         var result = ConvoMiner.NormalizeToTranscript(json, ConvoFormat.SlackJson);
         Assert.Contains("Hello team", result);
         Assert.Contains("Hey there", result);
@@ -142,11 +160,11 @@ public sealed class ConvoMinerTests
     public void Normalize_SlackJson_AlternatesRolesForDifferentUsers()
     {
         var json = """
-            [
-              {"type":"message","user":"U1","text":"from user one"},
-              {"type":"message","user":"U2","text":"from user two"}
-            ]
-            """;
+                   [
+                     {"type":"message","user":"U1","text":"from user one"},
+                     {"type":"message","user":"U2","text":"from user two"}
+                   ]
+                   """;
         var result = ConvoMiner.NormalizeToTranscript(json, ConvoFormat.SlackJson);
         // U1 → user (prefixed with >), U2 → assistant (no prefix)
         Assert.Contains("> from user one", result);
@@ -158,11 +176,11 @@ public sealed class ConvoMinerTests
     public void Normalize_SlackJson_SkipsNonMessageTypes()
     {
         var json = """
-            [
-              {"type":"channel_join","user":"U1","text":"joined"},
-              {"type":"message","user":"U1","text":"real message"}
-            ]
-            """;
+                   [
+                     {"type":"channel_join","user":"U1","text":"joined"},
+                     {"type":"message","user":"U1","text":"real message"}
+                   ]
+                   """;
         var result = ConvoMiner.NormalizeToTranscript(json, ConvoFormat.SlackJson);
         Assert.DoesNotContain("joined", result);
         Assert.Contains("real message", result);
@@ -208,7 +226,7 @@ public sealed class ConvoMinerTests
             "> Q2", "A2 " + new string('b', 40),
             "> Q3", "A3 " + new string('c', 40));
         var chunks = ConvoMiner.ChunkExchanges(content);
-        for (int i = 0; i < chunks.Count; i++)
+        for (var i = 0; i < chunks.Count; i++)
             Assert.Equal(i, chunks[i].ChunkIndex);
     }
 
@@ -238,10 +256,14 @@ public sealed class ConvoMinerTests
     // ── TopicKeywords completeness ────────────────────────────────────────────
 
     [Fact]
-    public void TopicKeywords_ContainsFiveRooms() =>
+    public void TopicKeywords_ContainsFiveRooms()
+    {
         Assert.Equal(5, ConvoMiner.TopicKeywords.Count);
+    }
 
     [Fact]
-    public void TopicKeywords_TechnicalContainsCode() =>
+    public void TopicKeywords_TechnicalContainsCode()
+    {
         Assert.Contains("code", ConvoMiner.TopicKeywords["technical"]);
+    }
 }

@@ -9,10 +9,10 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\Mempalace\Mempalace.csproj" />
+        <ProjectReference Include="..\..\src\Mempalace\Mempalace.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
+        <PackageReference Include="BenchmarkDotNet" Version="0.15.8"/>
     </ItemGroup>
 </Project>

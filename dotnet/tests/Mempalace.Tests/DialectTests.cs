@@ -16,7 +16,7 @@ public sealed class DialectTests
     [Fact]
     public void Compress_OutputContainsPipeSeparators()
     {
-        var d      = new Dialect();
+        var d = new Dialect();
         var result = d.Compress("We decided to use React because of the ecosystem.");
         // Content line should have pipe separators
         Assert.Contains("|", result);
@@ -27,21 +27,21 @@ public sealed class DialectTests
     [Fact]
     public void EncodeEntity_KnownMapping_ReturnsCode()
     {
-        var d = new Dialect(entities: new Dictionary<string, string> { ["Alice"] = "ALC" });
+        var d = new Dialect(new Dictionary<string, string> { ["Alice"] = "ALC" });
         Assert.Equal("ALC", d.EncodeEntity("Alice"));
     }
 
     [Fact]
     public void EncodeEntity_CaseInsensitive_ReturnsCode()
     {
-        var d = new Dialect(entities: new Dictionary<string, string> { ["alice"] = "ALC" });
+        var d = new Dialect(new Dictionary<string, string> { ["alice"] = "ALC" });
         Assert.Equal("ALC", d.EncodeEntity("Alice"));
     }
 
     [Fact]
     public void EncodeEntity_UnknownName_AutoCodes()
     {
-        var d    = new Dialect();
+        var d = new Dialect();
         var code = d.EncodeEntity("Zachary");
         Assert.Equal("ZAC", code);
     }
@@ -56,7 +56,7 @@ public sealed class DialectTests
     [Fact]
     public void EncodeEntity_SubstringMatch_ReturnsCode()
     {
-        var d = new Dialect(entities: new Dictionary<string, string> { ["Alice"] = "ALC" });
+        var d = new Dialect(new Dictionary<string, string> { ["Alice"] = "ALC" });
         // "Alice Smith" contains "Alice"
         Assert.Equal("ALC", d.EncodeEntity("Alice Smith"));
     }
@@ -66,7 +66,7 @@ public sealed class DialectTests
     [Fact]
     public void EncodeEmotions_KnownEmotions_ReturnsCompactCodes()
     {
-        var d      = new Dialect();
+        var d = new Dialect();
         var result = Dialect.EncodeEmotions(["joy", "fear", "love"]);
         Assert.Contains("joy", result);
         Assert.Contains("fear", result);
@@ -76,16 +76,16 @@ public sealed class DialectTests
     [Fact]
     public void EncodeEmotions_MoreThanThree_CappedAtThree()
     {
-        var d      = new Dialect();
+        var d = new Dialect();
         var result = Dialect.EncodeEmotions(["joy", "fear", "love", "hope", "grief"]);
-        var codes  = result.Split('+');
+        var codes = result.Split('+');
         Assert.True(codes.Length <= 3);
     }
 
     [Fact]
     public void EncodeEmotions_Deduplicates()
     {
-        var d      = new Dialect();
+        var d = new Dialect();
         var result = Dialect.EncodeEmotions(["joy", "joyful"]);
         // Both map to "joy" — should appear once
         var codes = result.Split('+');
@@ -101,15 +101,15 @@ public sealed class DialectTests
         var result = d.Compress("The architecture uses microservices.",
             new Dictionary<string, string>
             {
-                ["wing"]        = "myproject",
-                ["room"]        = "technical",
+                ["wing"] = "myproject",
+                ["room"] = "technical",
                 ["source_file"] = "/path/to/arch.md",
-                ["date"]        = "2026-04-11",
+                ["date"] = "2026-04-11"
             });
 
         Assert.Contains("myproject", result);
         Assert.Contains("technical", result);
-        Assert.Contains("arch", result);  // stem of source_file
+        Assert.Contains("arch", result); // stem of source_file
     }
 
     [Fact]
@@ -187,9 +187,9 @@ public sealed class DialectTests
     {
         var d = new Dialect();
         const string aaak = """
-            myproject|technical|2026-04-11|arch
-            0:ALC+BOB|chromadb_semantic|"key insight was batching"|determ|TECHNICAL
-            """;
+                            myproject|technical|2026-04-11|arch
+                            0:ALC+BOB|chromadb_semantic|"key insight was batching"|determ|TECHNICAL
+                            """;
 
         var decoded = Dialect.Decode(aaak);
         Assert.Equal("myproject", decoded.Header.GetValueOrDefault("file", ""));
@@ -199,8 +199,8 @@ public sealed class DialectTests
     [Fact]
     public void Decode_WithArc_ParsesArc()
     {
-        var d     = new Dialect();
-        var aaak  = "ARC:fear->hope->joy\n0:ALC|memory|\"test\"|fear";
+        var d = new Dialect();
+        var aaak = "ARC:fear->hope->joy\n0:ALC|memory|\"test\"|fear";
         var result = Dialect.Decode(aaak);
         Assert.Equal("fear->hope->joy", result.Arc);
     }
@@ -208,8 +208,8 @@ public sealed class DialectTests
     [Fact]
     public void Decode_WithTunnel_ParsesTunnel()
     {
-        var d     = new Dialect();
-        var aaak  = "T:001<->002|shared_concept\n0:ALC|memory";
+        var d = new Dialect();
+        var aaak = "T:001<->002|shared_concept\n0:ALC|memory";
         var result = Dialect.Decode(aaak);
         Assert.Contains("T:001<->002|shared_concept", result.Tunnels);
     }
@@ -217,7 +217,7 @@ public sealed class DialectTests
     [Fact]
     public void Decode_EmptyInput_ReturnsEmptyDecoded()
     {
-        var d      = new Dialect();
+        var d = new Dialect();
         var result = Dialect.Decode("");
         Assert.Empty(result.Arc);
         Assert.Empty(result.Zettels);
@@ -242,7 +242,7 @@ public sealed class DialectTests
     public void CountTokens_LongerText_MoreThanShorter()
     {
         var short_ = Dialect.CountTokens("hello world");
-        var long_  = Dialect.CountTokens("hello world foo bar baz qux quux corge grault");
+        var long_ = Dialect.CountTokens("hello world foo bar baz qux quux corge grault");
         Assert.True(long_ > short_);
     }
 
@@ -251,7 +251,7 @@ public sealed class DialectTests
     [Fact]
     public void CompressionStats_CompressedShorterThanOriginal()
     {
-        var d    = new Dialect();
+        var d = new Dialect();
         var text = string.Join(' ', Enumerable.Repeat(
             "We decided to use ChromaDB because it has semantic search capabilities.", 10));
         var compressed = d.Compress(text);
@@ -267,7 +267,7 @@ public sealed class DialectTests
     [Fact]
     public void CompressThenDecode_ProducesValidStructure()
     {
-        var d          = new Dialect();
+        var d = new Dialect();
         var compressed = d.Compress("We decided to use microservices because of scalability.",
             new Dictionary<string, string> { ["wing"] = "arch", ["room"] = "decisions" });
         var decoded = Dialect.Decode(compressed);

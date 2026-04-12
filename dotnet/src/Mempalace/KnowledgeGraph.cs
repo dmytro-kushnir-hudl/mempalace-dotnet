@@ -36,9 +36,6 @@ public sealed class KnowledgeGraph : IDisposable
     private readonly SqliteConnection _conn;
     private bool _disposed;
 
-    public static string DefaultPath =>
-        Path.Combine(Constants.DefaultConfigDir, "knowledge_graph.sqlite3");
-
     public KnowledgeGraph(string? dbPath = null)
     {
         var path = dbPath ?? DefaultPath;
@@ -52,6 +49,18 @@ public sealed class KnowledgeGraph : IDisposable
         CreateSchema();
     }
 
+    public static string DefaultPath =>
+        Path.Combine(Constants.DefaultConfigDir, "knowledge_graph.sqlite3");
+
+    // -------------------------------------------------------------------------
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _conn.Dispose();
+    }
+
     // -------------------------------------------------------------------------
     // Schema
     // -------------------------------------------------------------------------
@@ -59,31 +68,31 @@ public sealed class KnowledgeGraph : IDisposable
     private void CreateSchema()
     {
         Execute("""
-            CREATE TABLE IF NOT EXISTS entities (
-                id         TEXT PRIMARY KEY,
-                name       TEXT NOT NULL,
-                type       TEXT DEFAULT 'unknown',
-                properties TEXT DEFAULT '{}',
-                created_at TEXT DEFAULT (datetime('now'))
-            );
-            """);
+                CREATE TABLE IF NOT EXISTS entities (
+                    id         TEXT PRIMARY KEY,
+                    name       TEXT NOT NULL,
+                    type       TEXT DEFAULT 'unknown',
+                    properties TEXT DEFAULT '{}',
+                    created_at TEXT DEFAULT (datetime('now'))
+                );
+                """);
 
         Execute("""
-            CREATE TABLE IF NOT EXISTS triples (
-                id           TEXT PRIMARY KEY,
-                subject      TEXT NOT NULL,
-                predicate    TEXT NOT NULL,
-                object       TEXT NOT NULL,
-                valid_from   TEXT,
-                valid_to     TEXT,
-                confidence   REAL DEFAULT 1.0,
-                source_closet TEXT,
-                source_file  TEXT,
-                extracted_at TEXT DEFAULT (datetime('now')),
-                FOREIGN KEY (subject) REFERENCES entities(id),
-                FOREIGN KEY (object)  REFERENCES entities(id)
-            );
-            """);
+                CREATE TABLE IF NOT EXISTS triples (
+                    id           TEXT PRIMARY KEY,
+                    subject      TEXT NOT NULL,
+                    predicate    TEXT NOT NULL,
+                    object       TEXT NOT NULL,
+                    valid_from   TEXT,
+                    valid_to     TEXT,
+                    confidence   REAL DEFAULT 1.0,
+                    source_closet TEXT,
+                    source_file  TEXT,
+                    extracted_at TEXT DEFAULT (datetime('now')),
+                    FOREIGN KEY (subject) REFERENCES entities(id),
+                    FOREIGN KEY (object)  REFERENCES entities(id)
+                );
+                """);
 
         Execute("CREATE INDEX IF NOT EXISTS idx_triples_subject  ON triples(subject);");
         Execute("CREATE INDEX IF NOT EXISTS idx_triples_object   ON triples(object);");
@@ -98,17 +107,17 @@ public sealed class KnowledgeGraph : IDisposable
     public string AddEntity(string name, string type = "unknown",
         Dictionary<string, object?>? properties = null)
     {
-        var id    = NormaliseName(name);
+        var id = NormaliseName(name);
         var props = JsonSerializer.Serialize(properties ?? new Dictionary<string, object?>());
 
         Execute("""
-            INSERT INTO entities (id, name, type, properties)
-            VALUES ($id, $name, $type, $props)
-            ON CONFLICT(id) DO UPDATE SET
-                name       = excluded.name,
-                type       = excluded.type,
-                properties = excluded.properties;
-            """,
+                INSERT INTO entities (id, name, type, properties)
+                VALUES ($id, $name, $type, $props)
+                ON CONFLICT(id) DO UPDATE SET
+                    name       = excluded.name,
+                    type       = excluded.type,
+                    properties = excluded.properties;
+                """,
             ("$id", id), ("$name", name), ("$type", type), ("$props", props));
 
         return id;
@@ -122,39 +131,39 @@ public sealed class KnowledgeGraph : IDisposable
         string subject,
         string predicate,
         string obj,
-        string? validFrom    = null,
-        string? validTo      = null,
-        double confidence    = 1.0,
+        string? validFrom = null,
+        string? validTo = null,
+        double confidence = 1.0,
         string? sourceCloset = null,
-        string? sourceFile   = null)
+        string? sourceFile = null)
     {
-        var subId  = AddEntity(subject);
-        var objId  = AddEntity(obj);
+        var subId = AddEntity(subject);
+        var objId = AddEntity(obj);
         var predId = NormaliseName(predicate);
-        var id     = TripleId(subId, predId, objId);
+        var id = TripleId(subId, predId, objId);
 
         Execute("""
-            INSERT INTO triples
-                (id, subject, predicate, object, valid_from, valid_to,
-                 confidence, source_closet, source_file)
-            VALUES
-                ($id, $sub, $pred, $obj, $from, $to, $conf, $closet, $file)
-            ON CONFLICT(id) DO UPDATE SET
-                valid_from    = excluded.valid_from,
-                valid_to      = excluded.valid_to,
-                confidence    = excluded.confidence,
-                source_closet = excluded.source_closet,
-                source_file   = excluded.source_file;
-            """,
-            ("$id",     id),
-            ("$sub",    subId),
-            ("$pred",   predId),
-            ("$obj",    objId),
-            ("$from",   (object?)validFrom   ?? DBNull.Value),
-            ("$to",     (object?)validTo     ?? DBNull.Value),
-            ("$conf",   confidence),
+                INSERT INTO triples
+                    (id, subject, predicate, object, valid_from, valid_to,
+                     confidence, source_closet, source_file)
+                VALUES
+                    ($id, $sub, $pred, $obj, $from, $to, $conf, $closet, $file)
+                ON CONFLICT(id) DO UPDATE SET
+                    valid_from    = excluded.valid_from,
+                    valid_to      = excluded.valid_to,
+                    confidence    = excluded.confidence,
+                    source_closet = excluded.source_closet,
+                    source_file   = excluded.source_file;
+                """,
+            ("$id", id),
+            ("$sub", subId),
+            ("$pred", predId),
+            ("$obj", objId),
+            ("$from", (object?)validFrom ?? DBNull.Value),
+            ("$to", (object?)validTo ?? DBNull.Value),
+            ("$conf", confidence),
             ("$closet", (object?)sourceCloset ?? DBNull.Value),
-            ("$file",   (object?)sourceFile   ?? DBNull.Value));
+            ("$file", (object?)sourceFile ?? DBNull.Value));
 
         return id;
     }
@@ -162,16 +171,16 @@ public sealed class KnowledgeGraph : IDisposable
     /// <summary>Mark a triple as no longer valid (set valid_to).</summary>
     public void Invalidate(string subject, string predicate, string obj, string? ended = null)
     {
-        var subId  = NormaliseName(subject);
+        var subId = NormaliseName(subject);
         var predId = NormaliseName(predicate);
-        var objId  = NormaliseName(obj);
-        var end    = ended ?? DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var objId = NormaliseName(obj);
+        var end = ended ?? DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
         Execute("""
-            UPDATE triples SET valid_to = $end
-            WHERE subject = $sub AND predicate = $pred AND object = $obj
-              AND (valid_to IS NULL OR valid_to > $end);
-            """,
+                UPDATE triples SET valid_to = $end
+                WHERE subject = $sub AND predicate = $pred AND object = $obj
+                  AND (valid_to IS NULL OR valid_to > $end);
+                """,
             ("$end", end), ("$sub", subId), ("$pred", predId), ("$obj", objId));
     }
 
@@ -180,17 +189,17 @@ public sealed class KnowledgeGraph : IDisposable
     // -------------------------------------------------------------------------
 
     /// <summary>
-    ///     All triples for <paramref name="name"/>.
-    ///     Pass <paramref name="asOf"/> (ISO date) for temporal filtering.
-    ///     <paramref name="direction"/>: "outgoing" | "incoming" | "both".
+    ///     All triples for <paramref name="name" />.
+    ///     Pass <paramref name="asOf" /> (ISO date) for temporal filtering.
+    ///     <paramref name="direction" />: "outgoing" | "incoming" | "both".
     /// </summary>
     public IReadOnlyList<KgTriple> QueryEntity(
         string name,
-        string? asOf      = null,
-        string direction  = "outgoing")
+        string? asOf = null,
+        string direction = "outgoing")
     {
         var entityId = NormaliseName(name);
-        var results  = new List<KgTriple>();
+        var results = new List<KgTriple>();
 
         if (direction is "outgoing" or "both")
             results.AddRange(QueryTriples("subject", entityId, asOf, "outgoing"));
@@ -205,7 +214,7 @@ public sealed class KnowledgeGraph : IDisposable
     public IReadOnlyList<KgTriple> QueryRelationship(string predicate, string? asOf = null)
     {
         var predId = NormaliseName(predicate);
-        var sql    = BuildTemporalQuery("predicate = $pred", asOf);
+        var sql = BuildTemporalQuery("predicate = $pred", asOf);
 
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = sql;
@@ -218,19 +227,19 @@ public sealed class KnowledgeGraph : IDisposable
     /// <summary>Chronological timeline of facts, optionally scoped to an entity.</summary>
     public IReadOnlyList<KgTriple> Timeline(string? entityName = null)
     {
-        string filter = entityName is not null
+        var filter = entityName is not null
             ? "WHERE (subject = $id OR object = $id)"
             : "";
 
         var sql = $"""
-            SELECT id, subject, predicate, object,
-                   valid_from, valid_to, confidence, source_closet,
-                   (valid_to IS NULL) AS current
-            FROM triples
-            {filter}
-            ORDER BY COALESCE(valid_from, extracted_at)
-            LIMIT 100;
-            """;
+                   SELECT id, subject, predicate, object,
+                          valid_from, valid_to, confidence, source_closet,
+                          (valid_to IS NULL) AS current
+                   FROM triples
+                   {filter}
+                   ORDER BY COALESCE(valid_from, extracted_at)
+                   LIMIT 100;
+                   """;
 
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = sql;
@@ -246,10 +255,10 @@ public sealed class KnowledgeGraph : IDisposable
 
     public KgStats Stats()
     {
-        int entities = ScalarInt("SELECT COUNT(*) FROM entities;");
-        int triples  = ScalarInt("SELECT COUNT(*) FROM triples;");
-        int current  = ScalarInt("SELECT COUNT(*) FROM triples WHERE valid_to IS NULL;");
-        int expired  = triples - current;
+        var entities = ScalarInt("SELECT COUNT(*) FROM entities;");
+        var triples = ScalarInt("SELECT COUNT(*) FROM triples;");
+        var current = ScalarInt("SELECT COUNT(*) FROM triples WHERE valid_to IS NULL;");
+        var expired = triples - current;
 
         var relTypes = new List<string>();
         using var cmd = _conn.CreateCommand();
@@ -283,13 +292,13 @@ public sealed class KnowledgeGraph : IDisposable
             : "";
 
         return $"""
-            SELECT id, subject, predicate, object,
-                   valid_from, valid_to, confidence, source_closet,
-                   (valid_to IS NULL) AS current
-            FROM triples
-            WHERE {filter} {temporalClause}
-            ORDER BY COALESCE(valid_from, extracted_at);
-            """;
+                SELECT id, subject, predicate, object,
+                       valid_from, valid_to, confidence, source_closet,
+                       (valid_to IS NULL) AS current
+                FROM triples
+                WHERE {filter} {temporalClause}
+                ORDER BY COALESCE(valid_from, extracted_at);
+                """;
     }
 
     private static void AddAsOfParams(SqliteCommand cmd, string asOf)
@@ -302,19 +311,17 @@ public sealed class KnowledgeGraph : IDisposable
         var list = new List<KgTriple>();
         using var rdr = cmd.ExecuteReader();
         while (rdr.Read())
-        {
             list.Add(new KgTriple(
-                Id:           rdr.GetString(0),
-                Direction:    direction,
-                Subject:      rdr.GetString(1),
-                Predicate:    rdr.GetString(2),
-                Object:       rdr.GetString(3),
-                ValidFrom:    rdr.IsDBNull(4) ? null : rdr.GetString(4),
-                ValidTo:      rdr.IsDBNull(5) ? null : rdr.GetString(5),
-                Confidence:   rdr.GetDouble(6),
-                SourceCloset: rdr.IsDBNull(7) ? null : rdr.GetString(7),
-                Current:      rdr.GetInt32(8) == 1));
-        }
+                rdr.GetString(0),
+                direction,
+                rdr.GetString(1),
+                rdr.GetString(2),
+                rdr.GetString(3),
+                rdr.IsDBNull(4) ? null : rdr.GetString(4),
+                rdr.IsDBNull(5) ? null : rdr.GetString(5),
+                rdr.GetDouble(6),
+                rdr.IsDBNull(7) ? null : rdr.GetString(7),
+                rdr.GetInt32(8) == 1));
         return list;
     }
 
@@ -336,25 +343,18 @@ public sealed class KnowledgeGraph : IDisposable
 
     // ── ID normalisation ──────────────────────────────────────────────────────
 
-    public static string NormaliseName(string name) =>
-        name.ToLowerInvariant()
+    public static string NormaliseName(string name)
+    {
+        return name.ToLowerInvariant()
             .Replace(' ', '_')
             .Replace("'", "")
             .Trim('_');
+    }
 
     private static string TripleId(string subId, string predId, string objId)
     {
         var input = Encoding.UTF8.GetBytes($"{subId}|{predId}|{objId}");
-        var hash  = Convert.ToHexString(SHA256.HashData(input)).ToLowerInvariant()[..12];
+        var hash = Convert.ToHexString(SHA256.HashData(input)).ToLowerInvariant()[..12];
         return $"t_{subId}_{predId}_{objId}_{hash}";
-    }
-
-    // -------------------------------------------------------------------------
-
-    public void Dispose()
-    {
-        if (_disposed) return;
-        _disposed = true;
-        _conn.Dispose();
     }
 }
