@@ -86,15 +86,15 @@ public sealed class SqliteVectorCollectionTests : IDisposable
     public async Task Upsert_SingleRecord_CountIncreases()
     {
         await _col.UpsertAsync(["id1"], ["hello world"], _emb,
-            [Meta("tech", "backend")]);
+            [Meta("tech", "backend")], TestContext.Current.CancellationToken);
         Assert.Equal(1, _col.Count());
     }
 
     [Fact]
     public async Task Upsert_DuplicateId_Overwrites()
     {
-        await _col.UpsertAsync(["id1"], ["v1"], _emb, [Meta("tech", "backend")]);
-        await _col.UpsertAsync(["id1"], ["v2"], _emb, [Meta("tech", "backend")]);
+        await _col.UpsertAsync(["id1"], ["v1"], _emb, [Meta("tech", "backend")], TestContext.Current.CancellationToken);
+        await _col.UpsertAsync(["id1"], ["v2"], _emb, [Meta("tech", "backend")], TestContext.Current.CancellationToken);
         Assert.Equal(1, _col.Count());
 
         var rows = _col.Get(ids: ["id1"]);
@@ -108,7 +108,8 @@ public sealed class SqliteVectorCollectionTests : IDisposable
             ["a","b","c"],
             ["doc a","doc b","doc c"],
             _emb,
-            [Meta("w","r1"), Meta("w","r2"), Meta("w","r3")]);
+            [Meta("w","r1"), Meta("w","r2"), Meta("w","r3")],
+            TestContext.Current.CancellationToken);
         Assert.Equal(3, _col.Count());
     }
 
@@ -117,7 +118,7 @@ public sealed class SqliteVectorCollectionTests : IDisposable
     [Fact]
     public async Task Get_ById_ReturnsRecord()
     {
-        await _col.UpsertAsync(["x1"], ["content"], _emb, [Meta("wing1","room1")]);
+        await _col.UpsertAsync(["x1"], ["content"], _emb, [Meta("wing1","room1")], TestContext.Current.CancellationToken);
         var rows = _col.Get(ids: ["x1"]);
         Assert.Single(rows);
         Assert.Equal("x1",      rows[0].Id);
@@ -127,7 +128,7 @@ public sealed class SqliteVectorCollectionTests : IDisposable
     [Fact]
     public async Task Get_MissingId_ReturnsEmpty()
     {
-        await _col.UpsertAsync(["x1"], ["content"], _emb);
+        await _col.UpsertAsync(["x1"], ["content"], _emb, ct: TestContext.Current.CancellationToken);
         var rows = _col.Get(ids: ["nope"]);
         Assert.Empty(rows);
     }
@@ -141,7 +142,8 @@ public sealed class SqliteVectorCollectionTests : IDisposable
             ["a","b","c"],
             ["a doc","b doc","c doc"],
             _emb,
-            [Meta("alpha","r"), Meta("beta","r"), Meta("alpha","r")]);
+            [Meta("alpha","r"), Meta("beta","r"), Meta("alpha","r")],
+            TestContext.Current.CancellationToken);
 
         var rows = _col.Get(MetadataFilter.Where("wing", "alpha"));
         Assert.Equal(2, rows.Length);
@@ -155,7 +157,8 @@ public sealed class SqliteVectorCollectionTests : IDisposable
             ["a","b","c"],
             ["a doc","b doc","c doc"],
             _emb,
-            [Meta("w","r1"), Meta("w","r2"), Meta("w","r1")]);
+            [Meta("w","r1"), Meta("w","r2"), Meta("w","r1")],
+            TestContext.Current.CancellationToken);
 
         var rows = _col.Get(MetadataFilter.Where("wing","w").And("room","r1"));
         Assert.Equal(2, rows.Length);
@@ -169,7 +172,7 @@ public sealed class SqliteVectorCollectionTests : IDisposable
         await _col.UpsertAsync(
             ["a","b","c","d","e"],
             Enumerable.Range(0,5).Select(i => $"doc{i}").ToArray(),
-            _emb);
+            _emb, ct: TestContext.Current.CancellationToken);
         var rows = _col.Get(limit: 3);
         Assert.Equal(3, rows.Length);
     }
@@ -180,7 +183,7 @@ public sealed class SqliteVectorCollectionTests : IDisposable
         await _col.UpsertAsync(
             ["a","b","c"],
             ["doc a","doc b","doc c"],
-            _emb);
+            _emb, ct: TestContext.Current.CancellationToken);
         var all    = _col.Get();
         var paged  = _col.Get(offset: 1);
         Assert.Equal(all.Length - 1, paged.Length);
@@ -191,7 +194,7 @@ public sealed class SqliteVectorCollectionTests : IDisposable
     [Fact]
     public async Task Delete_ById_RemovesRecord()
     {
-        await _col.UpsertAsync(["d1","d2"], ["a","b"], _emb);
+        await _col.UpsertAsync(["d1","d2"], ["a","b"], _emb, ct: TestContext.Current.CancellationToken);
         _col.Delete(["d1"]);
         Assert.Equal(1, _col.Count());
         Assert.Empty(_col.Get(ids: ["d1"]));
@@ -206,7 +209,8 @@ public sealed class SqliteVectorCollectionTests : IDisposable
             ["a","b","c"],
             ["a","b","c"],
             _emb,
-            [Meta("wing1","r"), Meta("wing2","r"), Meta("wing1","r")]);
+            [Meta("wing1","r"), Meta("wing2","r"), Meta("wing1","r")],
+            TestContext.Current.CancellationToken);
 
         _col.Delete(MetadataFilter.Where("wing", "wing1"));
         Assert.Equal(1, _col.Count());
@@ -223,10 +227,11 @@ public sealed class SqliteVectorCollectionTests : IDisposable
             ["s1","s2","s3"],
             ["alpha","beta","gamma"],
             emb,
-            [Meta("w","r"), Meta("w","r"), Meta("w","r")]);
+            [Meta("w","r"), Meta("w","r"), Meta("w","r")],
+            TestContext.Current.CancellationToken);
 
         // "alpha" was embedded at index 0; same query text → same vector → sim=1
-        var results = await _col.SearchAsync("alpha", emb, nResults: 2);
+        var results = await _col.SearchAsync("alpha", emb, nResults: 2, ct: TestContext.Current.CancellationToken);
         Assert.Equal(2, results.Length);
         // Top result should be the exact match
         Assert.Equal("s1", results[0].Id);
@@ -241,10 +246,12 @@ public sealed class SqliteVectorCollectionTests : IDisposable
             ["x1","x2"],
             ["query doc","query doc"],
             emb,
-            [Meta("wingA","r"), Meta("wingB","r")]);
+            [Meta("wingA","r"), Meta("wingB","r")],
+            TestContext.Current.CancellationToken);
 
         var results = await _col.SearchAsync("query doc", emb, nResults: 5,
-            filter: MetadataFilter.Where("wing", "wingA"));
+            filter: MetadataFilter.Where("wing", "wingA"),
+            ct: TestContext.Current.CancellationToken);
 
         Assert.Single(results);
         Assert.Equal("x1", results[0].Id);
@@ -293,7 +300,8 @@ public sealed class PalaceSessionSqliteTests
 
             await session.Collection.UpsertAsync(
                 ["id1"], ["content"], emb,
-                [new Dictionary<string, object?> { ["source_file"] = "/some/file.cs" }]);
+                [new Dictionary<string, object?> { ["source_file"] = "/some/file.cs" }],
+                TestContext.Current.CancellationToken);
 
             Assert.True(session.FileAlreadyMined("/some/file.cs"));
         }
