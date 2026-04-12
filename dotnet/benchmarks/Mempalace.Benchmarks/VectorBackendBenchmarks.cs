@@ -84,7 +84,7 @@ public class VectorBackendBenchmarks : IDisposable
         await SeedPalaceAsync(_sqlitePalace);
 
         // Pre-warm: embed the search query once
-        var gen = await _embedder.GenerateAsync(["auth JWT token"]);
+        var gen = await _embedder.GenerateAsync(["auth JWT token".AsMemory()]);
         _queryEmbedding = gen[0];
     }
 
@@ -104,7 +104,7 @@ public class VectorBackendBenchmarks : IDisposable
     {
         var (id, doc, meta) = NextDrawer();
         using var session = PalaceSession.Open(_sqlitePalace, backend: VectorBackend.Sqlite);
-        await session.Collection.UpsertAsync([id], [doc], _embedder, [meta]);
+        await session.Collection.UpsertAsync([id], [doc.AsMemory()], _embedder, [meta]);
     }
 
     // ── SearchAsync ────────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ public class VectorBackendBenchmarks : IDisposable
         var rooms = new[] { "auth", "database", "api", "components", "config" };
 
         var ids = new string[WarmupDrawerCount];
-        var docs = new string[WarmupDrawerCount];
+        var docs = new ReadOnlyMemory<char>[WarmupDrawerCount];
         var metas = new Dictionary<string, object?>[WarmupDrawerCount];
 
         for (var i = 0; i < WarmupDrawerCount; i++)
@@ -154,7 +154,7 @@ public class VectorBackendBenchmarks : IDisposable
             var wing = wings[i % wings.Length];
             var room = rooms[i % rooms.Length];
             ids[i] = $"bench_{wing}_{room}_{i:D4}";
-            docs[i] = doc;
+            docs[i] = doc.AsMemory();
             metas[i] = new Dictionary<string, object?>
             {
                 ["wing"] = wing,

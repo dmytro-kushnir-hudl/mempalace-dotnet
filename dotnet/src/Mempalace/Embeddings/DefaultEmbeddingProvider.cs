@@ -17,14 +17,14 @@ internal static class OnnxNativeResolver
     {
         if (Interlocked.Exchange(ref _registered, 1) != 0) return;
         NativeLibrary.SetDllImportResolver(
-            typeof(Microsoft.ML.OnnxRuntime.OrtEnv).Assembly,
+            typeof(OrtEnv).Assembly,
             static (name, assembly, path) =>
             {
                 if (!name.Equals("onnxruntime.dll", StringComparison.OrdinalIgnoreCase))
                     return IntPtr.Zero;
                 // Try libonnxruntime.dylib next to the assembly, then default search
-                var dir = System.IO.Path.GetDirectoryName(assembly.Location) ?? ".";
-                var candidate = System.IO.Path.Combine(dir, "libonnxruntime.dylib");
+                var dir = Path.GetDirectoryName(assembly.Location) ?? ".";
+                var candidate = Path.Combine(dir, "libonnxruntime.dylib");
                 if (NativeLibrary.TryLoad(candidate, out var h)) return h;
                 if (NativeLibrary.TryLoad("libonnxruntime.dylib", assembly, path, out h)) return h;
                 return IntPtr.Zero;
@@ -44,7 +44,7 @@ internal static class OnnxNativeResolver
 /// </summary>
 /// <inheritdoc cref="IEmbeddingGenerator{TInput,TEmbedding}"/>
 public sealed class DefaultEmbeddingProvider
-    : IEmbeddingGenerator<string, Embedding<float>>, IDisposable, IAsyncDisposable
+    : IEmbeddingGenerator<ReadOnlyMemory<char>, Embedding<float>>, IDisposable, IAsyncDisposable
 {
     // Same constants as Python ONNXMiniLM_L6_V2
     public const string ModelName = "all-MiniLM-L6-v2";
@@ -64,6 +64,8 @@ public sealed class DefaultEmbeddingProvider
     private static readonly string Int8CacheDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".cache", "chroma", "onnx_models", ModelName + "-int8", "onnx");
+
+    private static readonly HttpClient Http = new();
 
     private readonly InferenceSession _session;
     private readonly BertTokenizer _tokenizer;
@@ -101,7 +103,7 @@ public sealed class DefaultEmbeddingProvider
         }
 
         Console.WriteLine("[embedder] loading tokenizer...");
-        var tokenizer = BertTokenizer.Create(vocabPath, new BertOptions { LowerCaseBeforeTokenization = true });
+        var tokenizer = await BertTokenizer.CreateAsync(vocabPath, new BertOptions { LowerCaseBeforeTokenization = true }, ct);
 
         var label = useInt8 ? "~23 MB INT8 quantized" : "~90 MB float32";
         Console.WriteLine($"[embedder] loading ONNX session ({label})...");
@@ -127,23 +129,21 @@ public sealed class DefaultEmbeddingProvider
     ///     <c>Microsoft.Extensions.VectorData</c> vector properties.
     /// </summary>
     public Task<GeneratedEmbeddings<Embedding<float>>> GenerateAsync(
-        IEnumerable<string> values,
+        IEnumerable<ReadOnlyMemory<char>> values,
         EmbeddingGenerationOptions? options = null,
         CancellationToken cancellationToken = default)
     {
         const int batchSize = 32;
-        var texts = values is IReadOnlyList<string> list ? list : values.ToList();
+        var texts = values is IReadOnlyList<ReadOnlyMemory<char>> list ? list : values.ToList();
         var embeddings = new List<Embedding<float>>(texts.Count);
 
         for (int i = 0; i < texts.Count; i += batchSize)
         {
             cancellationToken.ThrowIfCancellationRequested();
             int end = Math.Min(i + batchSize, texts.Count);
-            var batch = new string[end - i];
+            var batch = new ReadOnlyMemory<char>[end - i];
             for (int j = 0; j < batch.Length; j++) batch[j] = texts[i + j];
 
-            // EmbedBatch returns float[batch][EmbeddingDim] —
-            // each float[] implicitly becomes ReadOnlyMemory<float> via Embedding<float> ctor.
             var batchFloats = EmbedBatch(batch);
             foreach (var vec in batchFloats)
                 embeddings.Add(new Embedding<float>(vec));
@@ -153,38 +153,18 @@ public sealed class DefaultEmbeddingProvider
     }
 
     // IEmbeddingGenerator (non-generic base) service locator
-    object? Microsoft.Extensions.AI.IEmbeddingGenerator.GetService(Type serviceType, object? key)
+    object? IEmbeddingGenerator.GetService(Type serviceType, object? key)
         => serviceType.IsInstanceOfType(this) ? this : null;
-
-    // Internal batch path (kept for direct use in tests / binary FFI path)
-    internal Task<float[][]> EmbedBatchedAsync(IReadOnlyList<string> texts, CancellationToken ct = default)
-    {
-        const int batchSize = 32;
-        var result = new List<float[]>(texts.Count);
-
-        for (int i = 0; i < texts.Count; i += batchSize)
-        {
-            ct.ThrowIfCancellationRequested();
-            int end = Math.Min(i + batchSize, texts.Count);
-            var batch = new string[end - i];
-            for (int j = 0; j < batch.Length; j++)
-                batch[j] = texts[i + j];
-
-            result.AddRange(EmbedBatch(batch));
-        }
-
-        return Task.FromResult(result.ToArray());
-    }
 
     // -------------------------------------------------------------------------
     // Inference pipeline (mirrors Python _forward)
     // -------------------------------------------------------------------------
 
-    private float[][] EmbedBatch(string[] texts)
+    private float[][] EmbedBatch(ReadOnlyMemory<char>[] texts)
     {
         int batch = texts.Length;
 
-        var inputIds     = new long[batch * MaxTokens];
+        var inputIds      = new long[batch * MaxTokens];
         var attentionMask = new long[batch * MaxTokens];
         // token_type_ids stays all-zero (sentence-A only; default for single sentences)
 
@@ -192,23 +172,45 @@ public sealed class DefaultEmbeddingProvider
         {
             // BertTokenizer adds [CLS]=101 and [SEP]=102 automatically.
             // maxTokenCount caps the result (including special tokens) to MaxTokens.
-            var text = texts[b];
-            // Strip invalid Unicode — scan first, only allocate if dirty
-            var dirty = false;
-            foreach (var c in text.AsSpan())
+            var chars = texts[b].Span;
+
+            // Strip invalid Unicode — scan first, compact into pooled buf only if dirty
+            bool dirty = false;
+            foreach (var c in chars)
                 if (char.IsSurrogate(c) || c == '\uFFFE' || c == '\uFFFF') { dirty = true; break; }
+
+            ReadOnlySpan<char> tokenInput;
+            char[]? cleanBuf = null;
             if (dirty)
             {
-                var buf = System.Buffers.ArrayPool<char>.Shared.Rent(text.Length);
+                cleanBuf = System.Buffers.ArrayPool<char>.Shared.Rent(chars.Length);
                 int w = 0;
-                foreach (var c in text.AsSpan())
-                    if (!char.IsSurrogate(c) && c != '\uFFFE' && c != '\uFFFF') buf[w++] = c;
-                text = new string(buf, 0, w);
-                System.Buffers.ArrayPool<char>.Shared.Return(buf);
+                foreach (var c in chars)
+                    if (!char.IsSurrogate(c) && c != '\uFFFE' && c != '\uFFFF') cleanBuf[w++] = c;
+                tokenInput = cleanBuf.AsSpan(0, w);
             }
-            if (!text.IsNormalized())
-                text = text.Normalize();
-            var ids = _tokenizer.EncodeToIds(text.AsSpan(), MaxTokens, out _, out _);
+            else
+            {
+                tokenInput = chars;
+            }
+
+            // Normalization — skip alloc for pure-ASCII (always NFC)
+            string? normalized = null;
+            bool hasNonAscii = false;
+            foreach (var c in tokenInput)
+                if (c > 127) { hasNonAscii = true; break; }
+            if (hasNonAscii)
+            {
+                var s = new string(tokenInput);
+                if (!s.IsNormalized())
+                {
+                    normalized = s.Normalize();
+                    tokenInput = normalized.AsSpan();
+                }
+            }
+
+            var ids = _tokenizer.EncodeToIds(tokenInput, MaxTokens, out _, out _);
+            if (cleanBuf is not null) System.Buffers.ArrayPool<char>.Shared.Return(cleanBuf);
             int len = ids.Count;
 
             int baseIdx = b * MaxTokens;
@@ -288,9 +290,9 @@ public sealed class DefaultEmbeddingProvider
 
         if (!File.Exists(archivePath) || !VerifySha256(archivePath, ArchiveSha256))
         {
-            Console.Error.WriteLine($"[embedder] downloading model from {ArchiveUrl} ...");
+            Console.WriteLine($"[embedder] downloading model from {ArchiveUrl} ...");
             await DownloadFileAsync(ArchiveUrl, archivePath, ct).ConfigureAwait(false);
-            Console.Error.WriteLine("[embedder] download complete, verifying SHA-256...");
+            Console.WriteLine("[embedder] download complete, verifying SHA-256...");
 
             if (!VerifySha256(archivePath, ArchiveSha256))
             {
@@ -300,24 +302,23 @@ public sealed class DefaultEmbeddingProvider
             }
         }
 
-        Console.Error.WriteLine("[embedder] extracting archive...");
+        Console.WriteLine("[embedder] extracting archive...");
         ExtractTarGz(archivePath, parentDir);
-        Console.Error.WriteLine("[embedder] model extracted.");
+        Console.WriteLine("[embedder] model extracted.");
     }
 
     private static async Task EnsureInt8ModelAsync(string modelPath, CancellationToken ct)
     {
         if (File.Exists(modelPath)) return;
         Directory.CreateDirectory(Path.GetDirectoryName(modelPath)!);
-        Console.Error.WriteLine($"[embedder] downloading INT8 model from HuggingFace (~23 MB)...");
+        Console.WriteLine($"[embedder] downloading INT8 model from HuggingFace (~23 MB)...");
         await DownloadFileAsync(Int8ModelUrl, modelPath, ct).ConfigureAwait(false);
-        Console.Error.WriteLine("[embedder] INT8 model downloaded.");
+        Console.WriteLine("[embedder] INT8 model downloaded.");
     }
 
     private static async Task DownloadFileAsync(string url, string dest, CancellationToken ct)
     {
-        using var http = new HttpClient();
-        using var response = await http
+        using var response = await Http
             .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct)
             .ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
@@ -342,9 +343,7 @@ public sealed class DefaultEmbeddingProvider
         var hash = sha.ComputeHash(stream);
         return Convert.ToHexString(hash).Equals(expectedHex, StringComparison.OrdinalIgnoreCase);
     }
-
-    // -------------------------------------------------------------------------
-
+    
     public void Dispose()
     {
         if (_disposed) return;

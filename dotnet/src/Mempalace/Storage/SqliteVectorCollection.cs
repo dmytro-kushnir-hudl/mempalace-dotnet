@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Text;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.AI;
 
@@ -52,8 +53,8 @@ public sealed class SqliteVectorCollection : IVectorCollection
 
     public async Task UpsertAsync(
         string[] ids,
-        string[] documents,
-        IEmbeddingGenerator<string, Embedding<float>> embedder,
+        ReadOnlyMemory<char>[] documents,
+        IEmbeddingGenerator<ReadOnlyMemory<char>, Embedding<float>> embedder,
         Dictionary<string, object?>[]? metadatas = null,
         CancellationToken ct = default)
     {
@@ -67,7 +68,9 @@ public sealed class SqliteVectorCollection : IVectorCollection
             ct.ThrowIfCancellationRequested();
 
             var id = ids[i];
-            var doc = documents[i];
+            var docSpan = documents[i].Span;
+            var docBytes = new byte[Encoding.UTF8.GetByteCount(docSpan)];
+            Encoding.UTF8.GetBytes(docSpan, docBytes);
             var meta = metadatas?[i];
             var emb = vecs[i].Vector.ToArray();
             var embBytes = FloatsToBytes(emb);
@@ -99,7 +102,7 @@ public sealed class SqliteVectorCollection : IVectorCollection
                 ("$id", id), ("$wing", wing), ("$room", room),
                 ("$sf", sourceFile), ("$ci", chunkIndex), ("$ab", addedBy),
                 ("$fa", filedAt), ("$sm", sourceMtime),
-                ("$doc", doc), ("$mj", (object?)metaJson ?? DBNull.Value),
+                ("$doc", docBytes), ("$mj", (object?)metaJson ?? DBNull.Value),
                 ("$emb", embBytes));
 
             if (_hasVec0)
@@ -150,12 +153,12 @@ public sealed class SqliteVectorCollection : IVectorCollection
 
     public async Task<VectorSearchResult[]> SearchAsync(
         string query,
-        IEmbeddingGenerator<string, Embedding<float>> embedder,
+        IEmbeddingGenerator<ReadOnlyMemory<char>, Embedding<float>> embedder,
         int nResults = 5,
         MetadataFilter? filter = null,
         CancellationToken ct = default)
     {
-        var vecs = await embedder.GenerateAsync([query], cancellationToken: ct);
+        var vecs = await embedder.GenerateAsync([query.AsMemory()], cancellationToken: ct);
         var queryEmb = vecs[0].Vector.ToArray();
 
         return _hasVec0
@@ -211,7 +214,7 @@ public sealed class SqliteVectorCollection : IVectorCollection
         while (rdr2.Read())
         {
             var id = rdr2.GetString(0);
-            var doc = rdr2.IsDBNull(1) ? null : rdr2.GetString(1);
+            var doc = ReadDocBlob(rdr2, 1);
             var mj = rdr2.IsDBNull(2) ? null : rdr2.GetString(2);
             var meta = mj is null
                 ? null
@@ -262,7 +265,7 @@ public sealed class SqliteVectorCollection : IVectorCollection
                     added_by      TEXT,
                     filed_at      TEXT,
                     source_mtime  REAL,
-                    document      TEXT,
+                    document      BLOB,
                     metadata_json TEXT,
                     embedding     BLOB
                 );
@@ -345,7 +348,7 @@ public sealed class SqliteVectorCollection : IVectorCollection
             while (rdr.Read())
             {
                 var id = rdr.GetString(0);
-                var doc = rdr.IsDBNull(1) ? null : rdr.GetString(1);
+                var doc = ReadDocBlob(rdr, 1);
                 var mj = rdr.IsDBNull(2) ? null : rdr.GetString(2);
                 var embBlob = (byte[])rdr.GetValue(3);
                 var meta = mj is null
@@ -449,6 +452,24 @@ public sealed class SqliteVectorCollection : IVectorCollection
             JsonValueKind.False => false,
             JsonValueKind.Null => null,
             _ => je.GetRawText()
+        };
+    }
+
+    // ── Document BLOB read ────────────────────────────────────────────────────
+
+    /// <summary>
+    ///     Reads a document column stored as UTF-8 BLOB, or as legacy TEXT.
+    ///     SQLite returns BLOB values as <c>byte[]</c> via <see cref="SqliteDataReader.GetValue"/>;
+    ///     legacy TEXT rows return a <c>string</c> directly.
+    /// </summary>
+    private static string? ReadDocBlob(SqliteDataReader rdr, int ordinal)
+    {
+        if (rdr.IsDBNull(ordinal)) return null;
+        return rdr.GetValue(ordinal) switch
+        {
+            byte[] bytes => bytes.Length == 0 ? string.Empty : Encoding.UTF8.GetString(bytes),
+            string s     => s,   // legacy TEXT rows — readable transparently
+            var other    => other.ToString()
         };
     }
 

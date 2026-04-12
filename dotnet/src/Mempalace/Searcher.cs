@@ -35,7 +35,7 @@ public static class Searcher
     public static async Task<SearchResponse> SearchMemoriesAsync(
         string query,
         string palacePath,
-        IEmbeddingGenerator<string, Embedding<float>> embedder,
+        IEmbeddingGenerator<ReadOnlyMemory<char>, Embedding<float>> embedder,
         string? wing = null,
         string? room = null,
         int nResults = 5,

@@ -13,8 +13,8 @@ public interface IVectorCollection : IDisposable
     /// <summary>Embed <paramref name="documents" /> and upsert with metadata.</summary>
     Task UpsertAsync(
         string[] ids,
-        string[] documents,
-        IEmbeddingGenerator<string, Embedding<float>> embedder,
+        ReadOnlyMemory<char>[] documents,
+        IEmbeddingGenerator<ReadOnlyMemory<char>, Embedding<float>> embedder,
         Dictionary<string, object?>[]? metadatas = null,
         CancellationToken ct = default);
 
@@ -29,7 +29,7 @@ public interface IVectorCollection : IDisposable
     /// <summary>Semantic search: embed query, return top-N nearest neighbours.</summary>
     Task<VectorSearchResult[]> SearchAsync(
         string query,
-        IEmbeddingGenerator<string, Embedding<float>> embedder,
+        IEmbeddingGenerator<ReadOnlyMemory<char>, Embedding<float>> embedder,
         int nResults = 5,
         MetadataFilter? filter = null,
         CancellationToken ct = default);

@@ -13,7 +13,7 @@ namespace Mempalace;
 // Data types
 // ---------------------------------------------------------------------------
 
-public sealed record Chunk(string Content, int ChunkIndex);
+public sealed record Chunk(ReadOnlyMemory<char> Content, int ChunkIndex);
 
 public sealed record MinerOptions(
     string? WingOverride = null,
@@ -33,6 +33,9 @@ public static class Miner
 {
     private const int BatchSize = 32;
 
+    private static readonly ArrayPool<ReadOnlyMemory<char>> DocPool =
+        ArrayPool<ReadOnlyMemory<char>>.Shared;
+
     private static readonly ArrayPool<string> StringPool =
         ArrayPool<string>.Shared;
 
@@ -45,6 +48,7 @@ public static class Miner
     public static List<Chunk> ChunkText(string content)
     {
         var chunks = new List<Chunk>();
+        var mem = content.AsMemory();
         var span = content.AsSpan();
         var start = 0;
 
@@ -62,10 +66,14 @@ public static class Miner
                     end = breakAt + 1;
             }
 
-            // Trim via span — single allocation only if non-empty
-            var slice = span[start..end].Trim();
-            if (slice.Length >= Constants.MinChunkSize)
-                chunks.Add(new Chunk(new string(slice), chunks.Count));
+            // Compute trim offsets without materializing a new string
+            var raw = span[start..end];
+            var trimmed = raw.TrimStart();
+            var trimStart = raw.Length - trimmed.Length;
+            var trimLen = trimmed.TrimEnd().Length;
+
+            if (trimLen >= Constants.MinChunkSize)
+                chunks.Add(new Chunk(mem.Slice(start + trimStart, trimLen), chunks.Count));
 
             start = end < span.Length ? end - Constants.ChunkOverlap : end;
         }
@@ -102,7 +110,7 @@ public static class Miner
 
     public static async Task AddDrawerAsync(
         IVectorCollection collection,
-        IEmbeddingGenerator<string, Embedding<float>> embedder,
+        IEmbeddingGenerator<ReadOnlyMemory<char>, Embedding<float>> embedder,
         string wing,
         string room,
         string content,
@@ -125,7 +133,7 @@ public static class Miner
 
         await collection.UpsertAsync(
             [id],
-            [content],
+            [content.AsMemory()],
             embedder,
             [metadata],
             ct);
@@ -133,7 +141,7 @@ public static class Miner
 
     private static async Task FlushBatchAsync(
         IVectorCollection collection,
-        IEmbeddingGenerator<string, Embedding<float>> embedder,
+        IEmbeddingGenerator<ReadOnlyMemory<char>, Embedding<float>> embedder,
         List<PendingChunk> batch,
         CancellationToken ct)
     {
@@ -141,7 +149,7 @@ public static class Miner
         var n = batch.Count;
         var now = DateTime.UtcNow.ToString("O");
         var ids = StringPool.Rent(n);
-        var docs = StringPool.Rent(n);
+        var docs = DocPool.Rent(n);
         var metas = MetaPool.Rent(n);
         try
         {
@@ -168,7 +176,7 @@ public static class Miner
         finally
         {
             StringPool.Return(ids, true);
-            StringPool.Return(docs, true);
+            DocPool.Return(docs, true);
             MetaPool.Return(metas, true);
             batch.Clear();
         }
@@ -223,7 +231,7 @@ public static class Miner
     public static Task MineAsync(
         string projectDir,
         string palacePath,
-        IEmbeddingGenerator<string, Embedding<float>> embedder,
+        IEmbeddingGenerator<ReadOnlyMemory<char>, Embedding<float>> embedder,
         MinerOptions? options = null,
         CancellationToken ct = default)
     {
@@ -236,7 +244,7 @@ public static class Miner
     private static async Task MineAsyncPipelined(
         string projectDir,
         string palacePath,
-        IEmbeddingGenerator<string, Embedding<float>> embedder,
+        IEmbeddingGenerator<ReadOnlyMemory<char>, Embedding<float>> embedder,
         MinerOptions options,
         CancellationToken ct)
     {
@@ -352,7 +360,7 @@ public static class Miner
     private static async Task MineAsyncSerial(
         string projectDir,
         string palacePath,
-        IEmbeddingGenerator<string, Embedding<float>> embedder,
+        IEmbeddingGenerator<ReadOnlyMemory<char>, Embedding<float>> embedder,
         MinerOptions options,
         CancellationToken ct)
     {
@@ -499,7 +507,7 @@ public static class Miner
     private record PendingChunk(
         string Wing,
         string Room,
-        string Content,
+        ReadOnlyMemory<char> Content,
         string SourceFile,
         int ChunkIndex,
         string Agent,

@@ -9,7 +9,7 @@ namespace Mempalace.Tests;
 // ---------------------------------------------------------------------------
 
 internal sealed class StubEmbeddingGenerator
-    : IEmbeddingGenerator<string, Embedding<float>>
+    : IEmbeddingGenerator<ReadOnlyMemory<char>, Embedding<float>>
 {
     private const int Dim = 384;
     private readonly Dictionary<string, float[]> _cache = new();
@@ -18,17 +18,18 @@ internal sealed class StubEmbeddingGenerator
     public EmbeddingGeneratorMetadata Metadata => new("stub", null, null, Dim);
 
     public Task<GeneratedEmbeddings<Embedding<float>>> GenerateAsync(
-        IEnumerable<string> values,
+        IEnumerable<ReadOnlyMemory<char>> values,
         EmbeddingGenerationOptions? options = null,
         CancellationToken cancellationToken = default)
     {
         var list = new List<Embedding<float>>();
         foreach (var v in values)
         {
-            if (!_cache.TryGetValue(v, out var emb))
+            var key = v.ToString();
+            if (!_cache.TryGetValue(key, out var emb))
             {
                 emb = MakeEmb(_next++);
-                _cache[v] = emb;
+                _cache[key] = emb;
             }
 
             list.Add(new Embedding<float>(emb));
@@ -59,6 +60,13 @@ internal sealed class StubEmbeddingGenerator
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+file static class Docs
+{
+    /// <summary>Converts string literals to ReadOnlyMemory&lt;char&gt;[] for UpsertAsync call sites.</summary>
+    public static ReadOnlyMemory<char>[] Of(params string[] docs)
+        => Array.ConvertAll(docs, s => s.AsMemory());
+}
 
 file static class TestDb
 {
@@ -97,7 +105,7 @@ public sealed class SqliteVectorCollectionTests : IDisposable
     [Fact]
     public async Task Upsert_SingleRecord_CountIncreases()
     {
-        await _col.UpsertAsync(["id1"], ["hello world"], _emb,
+        await _col.UpsertAsync(["id1"], Docs.Of("hello world"), _emb,
             [Meta("tech", "backend")], TestContext.Current.CancellationToken);
         Assert.Equal(1, _col.Count());
     }
@@ -105,8 +113,8 @@ public sealed class SqliteVectorCollectionTests : IDisposable
     [Fact]
     public async Task Upsert_DuplicateId_Overwrites()
     {
-        await _col.UpsertAsync(["id1"], ["v1"], _emb, [Meta("tech", "backend")], TestContext.Current.CancellationToken);
-        await _col.UpsertAsync(["id1"], ["v2"], _emb, [Meta("tech", "backend")], TestContext.Current.CancellationToken);
+        await _col.UpsertAsync(["id1"], Docs.Of("v1"), _emb, [Meta("tech", "backend")], TestContext.Current.CancellationToken);
+        await _col.UpsertAsync(["id1"], Docs.Of("v2"), _emb, [Meta("tech", "backend")], TestContext.Current.CancellationToken);
         Assert.Equal(1, _col.Count());
 
         var rows = _col.Get(ids: ["id1"]);
@@ -118,7 +126,7 @@ public sealed class SqliteVectorCollectionTests : IDisposable
     {
         await _col.UpsertAsync(
             ["a", "b", "c"],
-            ["doc a", "doc b", "doc c"],
+            Docs.Of("doc a", "doc b", "doc c"),
             _emb,
             [Meta("w", "r1"), Meta("w", "r2"), Meta("w", "r3")],
             TestContext.Current.CancellationToken);
@@ -130,7 +138,7 @@ public sealed class SqliteVectorCollectionTests : IDisposable
     [Fact]
     public async Task Get_ById_ReturnsRecord()
     {
-        await _col.UpsertAsync(["x1"], ["content"], _emb, [Meta("wing1", "room1")],
+        await _col.UpsertAsync(["x1"], Docs.Of("content"), _emb, [Meta("wing1", "room1")],
             TestContext.Current.CancellationToken);
         var rows = _col.Get(ids: ["x1"]);
         Assert.Single(rows);
@@ -141,7 +149,7 @@ public sealed class SqliteVectorCollectionTests : IDisposable
     [Fact]
     public async Task Get_MissingId_ReturnsEmpty()
     {
-        await _col.UpsertAsync(["x1"], ["content"], _emb, ct: TestContext.Current.CancellationToken);
+        await _col.UpsertAsync(["x1"], Docs.Of("content"), _emb, ct: TestContext.Current.CancellationToken);
         var rows = _col.Get(ids: ["nope"]);
         Assert.Empty(rows);
     }
@@ -153,7 +161,7 @@ public sealed class SqliteVectorCollectionTests : IDisposable
     {
         await _col.UpsertAsync(
             ["a", "b", "c"],
-            ["a doc", "b doc", "c doc"],
+            Docs.Of("a doc", "b doc", "c doc"),
             _emb,
             [Meta("alpha", "r"), Meta("beta", "r"), Meta("alpha", "r")],
             TestContext.Current.CancellationToken);
@@ -168,7 +176,7 @@ public sealed class SqliteVectorCollectionTests : IDisposable
     {
         await _col.UpsertAsync(
             ["a", "b", "c"],
-            ["a doc", "b doc", "c doc"],
+            Docs.Of("a doc", "b doc", "c doc"),
             _emb,
             [Meta("w", "r1"), Meta("w", "r2"), Meta("w", "r1")],
             TestContext.Current.CancellationToken);
@@ -184,7 +192,7 @@ public sealed class SqliteVectorCollectionTests : IDisposable
     {
         await _col.UpsertAsync(
             ["a", "b", "c", "d", "e"],
-            Enumerable.Range(0, 5).Select(i => $"doc{i}").ToArray(),
+            Enumerable.Range(0, 5).Select(i => $"doc{i}".AsMemory()).ToArray(),
             _emb, ct: TestContext.Current.CancellationToken);
         var rows = _col.Get(limit: 3);
         Assert.Equal(3, rows.Length);
@@ -195,7 +203,7 @@ public sealed class SqliteVectorCollectionTests : IDisposable
     {
         await _col.UpsertAsync(
             ["a", "b", "c"],
-            ["doc a", "doc b", "doc c"],
+            Docs.Of("doc a", "doc b", "doc c"),
             _emb, ct: TestContext.Current.CancellationToken);
         var all = _col.Get();
         var paged = _col.Get(offset: 1);
@@ -207,7 +215,7 @@ public sealed class SqliteVectorCollectionTests : IDisposable
     [Fact]
     public async Task Delete_ById_RemovesRecord()
     {
-        await _col.UpsertAsync(["d1", "d2"], ["a", "b"], _emb, ct: TestContext.Current.CancellationToken);
+        await _col.UpsertAsync(["d1", "d2"], Docs.Of("a", "b"), _emb, ct: TestContext.Current.CancellationToken);
         _col.Delete(["d1"]);
         Assert.Equal(1, _col.Count());
         Assert.Empty(_col.Get(ids: ["d1"]));
@@ -220,7 +228,7 @@ public sealed class SqliteVectorCollectionTests : IDisposable
     {
         await _col.UpsertAsync(
             ["a", "b", "c"],
-            ["a", "b", "c"],
+            Docs.Of("a", "b", "c"),
             _emb,
             [Meta("wing1", "r"), Meta("wing2", "r"), Meta("wing1", "r")],
             TestContext.Current.CancellationToken);
@@ -238,7 +246,7 @@ public sealed class SqliteVectorCollectionTests : IDisposable
         var emb = new StubEmbeddingGenerator();
         await _col.UpsertAsync(
             ["s1", "s2", "s3"],
-            ["alpha", "beta", "gamma"],
+            Docs.Of("alpha", "beta", "gamma"),
             emb,
             [Meta("w", "r"), Meta("w", "r"), Meta("w", "r")],
             TestContext.Current.CancellationToken);
@@ -257,7 +265,7 @@ public sealed class SqliteVectorCollectionTests : IDisposable
         var emb = new StubEmbeddingGenerator();
         await _col.UpsertAsync(
             ["x1", "x2"],
-            ["query doc", "query doc"],
+            Docs.Of("query doc", "query doc"),
             emb,
             [Meta("wingA", "r"), Meta("wingB", "r")],
             TestContext.Current.CancellationToken);
@@ -315,7 +323,7 @@ public sealed class PalaceSessionSqliteTests
             Assert.False(session.FileAlreadyMined("/some/file.cs"));
 
             await session.Collection.UpsertAsync(
-                ["id1"], ["content"], emb,
+                ["id1"], Docs.Of("content"), emb,
                 [new Dictionary<string, object?> { ["source_file"] = "/some/file.cs" }],
                 TestContext.Current.CancellationToken);
 

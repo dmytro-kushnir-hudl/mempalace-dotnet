@@ -15,14 +15,14 @@ public sealed class McpToolContext(
     string palacePath,
     string collectionName,
     string kgPath,
-    IEmbeddingGenerator<string, Embedding<float>> embedder,
+    IEmbeddingGenerator<ReadOnlyMemory<char>, Embedding<float>> embedder,
     VectorBackend backend = VectorBackend.Sqlite)
 {
     public string PalacePath { get; } = palacePath;
     public string CollectionName { get; } = collectionName;
     public string KgPath { get; } = kgPath;
     public VectorBackend Backend { get; } = backend;
-    public IEmbeddingGenerator<string, Embedding<float>> Embedder { get; } = embedder;
+    public IEmbeddingGenerator<ReadOnlyMemory<char>, Embedding<float>> Embedder { get; } = embedder;
 
     public PalaceSession OpenPalace()
     {
@@ -357,7 +357,7 @@ public static class McpTools
 
             await s.Collection.UpsertAsync(
                 [id],
-                [content],
+                [content.AsMemory()],
                 ctx.Embedder,
                 [
                     new Dictionary<string, object?>
@@ -496,7 +496,7 @@ public static class McpTools
             using var s = ctx.OpenPalace();
             await s.Collection.UpsertAsync(
                 [id],
-                [entry],
+                [entry.AsMemory()],
                 ctx.Embedder,
                 [
                     new Dictionary<string, object?>

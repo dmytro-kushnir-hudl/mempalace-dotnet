@@ -192,7 +192,7 @@ public sealed class EmbedderFixture : IAsyncLifetime
 ///     Call <see cref="CreateContext" /> to get a fresh McpToolContext.
 ///     Dispose removes the temp directory.
 /// </summary>
-public sealed class PalaceFactory(IEmbeddingGenerator<string, Embedding<float>> embedder) : IDisposable
+public sealed class PalaceFactory(IEmbeddingGenerator<ReadOnlyMemory<char>, Embedding<float>> embedder) : IDisposable
 {
     private readonly List<string> _dirs = [];
 

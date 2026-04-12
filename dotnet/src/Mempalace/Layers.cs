@@ -161,7 +161,7 @@ public sealed class Layer3(string? palacePath = null, VectorBackend backend = Ve
 
     public async Task<string> SearchAsync(
         string query,
-        IEmbeddingGenerator<string, Embedding<float>> embedder,
+        IEmbeddingGenerator<ReadOnlyMemory<char>, Embedding<float>> embedder,
         string? wing = null,
         string? room = null,
         int nResults = 5,
@@ -185,7 +185,7 @@ public sealed class Layer3(string? palacePath = null, VectorBackend backend = Ve
 
     public async Task<IReadOnlyList<SearchResult>> SearchRawAsync(
         string query,
-        IEmbeddingGenerator<string, Embedding<float>> embedder,
+        IEmbeddingGenerator<ReadOnlyMemory<char>, Embedding<float>> embedder,
         string? wing = null,
         string? room = null,
         int nResults = 5,
@@ -248,7 +248,7 @@ public sealed class MemoryStack
 
     public Task<string> SearchAsync(
         string query,
-        IEmbeddingGenerator<string, Embedding<float>> embedder,
+        IEmbeddingGenerator<ReadOnlyMemory<char>, Embedding<float>> embedder,
         string? wing = null,
         string? room = null,
         int nResults = 5,

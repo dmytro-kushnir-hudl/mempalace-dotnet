@@ -61,7 +61,7 @@ public sealed class MinerTests
         var content = new string('z', Constants.ChunkSize * 3);
         var chunks = Miner.ChunkText(content);
         Assert.True(chunks.Count >= 2);
-        Assert.All(chunks, c => Assert.NotEmpty(c.Content));
+        Assert.All(chunks, c => Assert.True(c.Content.Length > 0));
     }
 
     // ── DrawerId ──────────────────────────────────────────────────────────────

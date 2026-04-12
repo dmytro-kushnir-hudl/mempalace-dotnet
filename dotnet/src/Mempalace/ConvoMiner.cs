@@ -375,7 +375,7 @@ public static class ConvoMiner
     public static async Task MineConvosAsync(
         string sourceDir,
         string palacePath,
-        IEmbeddingGenerator<string, Embedding<float>> embedder,
+        IEmbeddingGenerator<ReadOnlyMemory<char>, Embedding<float>> embedder,
         ConvoMinerOptions? options = null,
         CancellationToken ct = default)
     {
@@ -435,7 +435,7 @@ public static class ConvoMiner
                 var id = Miner.DrawerId(wing, room, file, chunk.ChunkIndex);
                 await session.Collection.UpsertAsync(
                     [id],
-                    [chunk.Content],
+                    [chunk.Content.AsMemory()],
                     embedder,
                     [
                         new Dictionary<string, object?>
