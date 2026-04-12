@@ -1,5 +1,4 @@
 using System.Net.Http.Headers;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
@@ -38,7 +37,7 @@ public sealed class EntityRegistry
 
     // ── Common English words that double as names ─────────────────────────────
 
-    private static readonly IReadOnlySet<string> CommonEnglishWords =
+    private static readonly HashSet<string> CommonEnglishWords =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "ever","grace","will","bill","mark","april","may","june","joy","hope",
@@ -118,7 +117,7 @@ public sealed class EntityRegistry
             {
                 var raw  = File.ReadAllText(path);
                 var data = JsonSerializer.Deserialize<Dictionary<string, object?>>(raw,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    Json.CaseInsensitive);
                 if (data is not null) return new EntityRegistry(data, path);
             }
             catch { /* fall through to empty */ }
@@ -133,7 +132,7 @@ public sealed class EntityRegistry
         Directory.CreateDirectory(dir);
         File.WriteAllText(_path,
             JsonSerializer.Serialize(_data,
-                new JsonSerializerOptions { WriteIndented = true }));
+                Json.Indented));
     }
 
     private static Dictionary<string, object?> Empty() => new()
@@ -540,18 +539,18 @@ public sealed class EntityRegistry
 
     // ── Private disambiguation ────────────────────────────────────────────────
 
-    private EntityLookupResult? Disambiguate(
+    private static EntityLookupResult? Disambiguate(
         string word, string context, IReadOnlyDictionary<string, object?> personInfo)
     {
         var n = Regex.Escape(word.ToLowerInvariant());
         var ctx = context.ToLowerInvariant();
 
         int personScore = PersonContextTemplates
-            .Count(t => Regex.IsMatch(ctx, string.Format(t, n),
+            .Count(t => Regex.IsMatch(ctx, string.Format(CultureInfo.InvariantCulture, t, n),
                 RegexOptions.IgnoreCase | RegexOptions.Multiline));
 
         int conceptScore = ConceptContextTemplates
-            .Count(t => Regex.IsMatch(ctx, string.Format(t, n),
+            .Count(t => Regex.IsMatch(ctx, string.Format(CultureInfo.InvariantCulture, t, n),
                 RegexOptions.IgnoreCase));
 
         if (personScore > conceptScore)
@@ -620,10 +619,10 @@ public sealed class EntityRegistry
         return [];
     }
 
-    private IReadOnlyList<string> GetStringList(string key) =>
+    private List<string> GetStringList(string key) =>
         GetOrCreateStringList(key);
 
-    private static IReadOnlyDictionary<string, object?> AsDictionary(object? val)
+    private static Dictionary<string, object?> AsDictionary(object? val)
         => AsDictionaryMutable(val);
 
     private static Dictionary<string, object?> AsDictionaryMutable(object? val)
@@ -635,7 +634,7 @@ public sealed class EntityRegistry
         return new Dictionary<string, object?>();
     }
 
-    private static IReadOnlyList<string> GetStringListFromObj(object? val)
+    private static List<string> GetStringListFromObj(object? val)
     {
         if (val is IEnumerable<string> ls) return ls.ToList();
         if (val is List<object?> lo) return lo.OfType<string>().ToList();

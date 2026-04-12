@@ -6,6 +6,8 @@
         <RootNamespace>Mempalace</RootNamespace>
         <AssemblyName>Mempalace</AssemblyName>
         <Version>0.1.0</Version>
+        <EnableNETAnalyzers>true</EnableNETAnalyzers>
+        <AnalysisLevel>latest-recommended</AnalysisLevel>
     </PropertyGroup>
 
     <ItemGroup>

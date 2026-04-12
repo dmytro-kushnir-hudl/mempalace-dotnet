@@ -59,7 +59,7 @@ public sealed class PalaceSession : IDisposable
         var storedMtime  = storedRaw switch {
             double d                              => d,
             System.Text.Json.JsonElement je       => je.GetDouble(),
-            _                                     => Convert.ToDouble(storedRaw),
+            _                                     => Convert.ToDouble(storedRaw, CultureInfo.InvariantCulture),
         };
         var currentMtime = GetUnixMtime(sourceFile);
         return Math.Abs(storedMtime - currentMtime) < 0.001;

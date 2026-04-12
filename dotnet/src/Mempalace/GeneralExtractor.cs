@@ -93,7 +93,7 @@ public static class GeneralExtractor
         @"never told anyone", @"nobody knows", @"\*[^*]+\*",
     ];
 
-    private static readonly IReadOnlyDictionary<MemoryType, string[]> AllMarkers =
+    private static readonly Dictionary<MemoryType, string[]> AllMarkers =
         new Dictionary<MemoryType, string[]>
         {
             [MemoryType.Decision]   = DecisionMarkers,
@@ -104,7 +104,7 @@ public static class GeneralExtractor
         };
 
     // Compiled marker regex cache (per type)
-    private static readonly IReadOnlyDictionary<MemoryType, Regex[]> CompiledMarkers =
+    private static readonly Dictionary<MemoryType, Regex[]> CompiledMarkers =
         AllMarkers.ToDictionary(
             kv => kv.Key,
             kv => kv.Value
@@ -113,7 +113,7 @@ public static class GeneralExtractor
 
     // ── Sentiment ─────────────────────────────────────────────────────────────
 
-    private static readonly IReadOnlySet<string> PositiveWords = new HashSet<string>
+    private static readonly HashSet<string> PositiveWords = new HashSet<string>
     {
         "pride","proud","joy","happy","love","loving","beautiful","amazing","wonderful",
         "incredible","fantastic","brilliant","perfect","excited","thrilled","grateful",
@@ -121,7 +121,7 @@ public static class GeneralExtractor
         "heart","hug","precious","adore",
     };
 
-    private static readonly IReadOnlySet<string> NegativeWords = new HashSet<string>
+    private static readonly HashSet<string> NegativeWords = new HashSet<string>
     {
         "bug","error","crash","crashing","crashed","fail","failed","failing","failure",
         "broken","broke","breaking","breaks","issue","problem","wrong","stuck","blocked",
@@ -220,7 +220,7 @@ public static class GeneralExtractor
     {
         double score = 0;
         foreach (var rx in regexes)
-            score += rx.Matches(text).Count;
+            score += rx.Count(text);
         return score;
     }
 
@@ -274,7 +274,7 @@ public static class GeneralExtractor
 
         foreach (var line in lines)
         {
-            if (line.TrimStart().StartsWith("```")) { inCode = !inCode; continue; }
+            if (line.TrimStart().StartsWith("```", StringComparison.Ordinal)) { inCode = !inCode; continue; }
             if (inCode) continue;
             if (!IsCodeLine(line)) prose.Add(line);
         }
@@ -283,7 +283,7 @@ public static class GeneralExtractor
         return result.Length > 0 ? result : text;
     }
 
-    private static IReadOnlyList<string> SplitIntoSegments(string text)
+    private static List<string> SplitIntoSegments(string text)
     {
         var lines = text.Split('\n');
         int turnCount = lines.Count(l => TurnPatterns.Any(rx => rx.IsMatch(l.Trim())));
@@ -310,7 +310,7 @@ public static class GeneralExtractor
         return paras;
     }
 
-    private static IReadOnlyList<string> SplitByTurns(string[] lines)
+    private static List<string> SplitByTurns(string[] lines)
     {
         var segments = new List<string>();
         var current  = new List<string>();

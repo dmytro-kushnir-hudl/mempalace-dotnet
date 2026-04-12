@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -144,6 +143,7 @@ public sealed class MempalaceConfig
     private static readonly string ConfigFilePath =
         Path.Combine(Constants.DefaultConfigDir, "config.json");
 
+
     public string PalacePath { get; init; } = Constants.DefaultPalacePath;
     public string CollectionName { get; init; } = Constants.DefaultCollectionName;
     public string IdentityPath { get; init; } = Constants.DefaultIdentityPath;
@@ -156,8 +156,7 @@ public sealed class MempalaceConfig
         try
         {
             var json = File.ReadAllText(ConfigFilePath);
-            return JsonSerializer.Deserialize<MempalaceConfig>(json,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+            return JsonSerializer.Deserialize<MempalaceConfig>(json, Json.CaseInsensitive)
                 ?? new MempalaceConfig();
         }
         catch { return new MempalaceConfig(); }

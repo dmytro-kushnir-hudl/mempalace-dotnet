@@ -67,7 +67,7 @@ public sealed class DialectTests
     public void EncodeEmotions_KnownEmotions_ReturnsCompactCodes()
     {
         var d      = new Dialect();
-        var result = d.EncodeEmotions(["joy", "fear", "love"]);
+        var result = Dialect.EncodeEmotions(["joy", "fear", "love"]);
         Assert.Contains("joy", result);
         Assert.Contains("fear", result);
         Assert.Contains("love", result);
@@ -77,7 +77,7 @@ public sealed class DialectTests
     public void EncodeEmotions_MoreThanThree_CappedAtThree()
     {
         var d      = new Dialect();
-        var result = d.EncodeEmotions(["joy", "fear", "love", "hope", "grief"]);
+        var result = Dialect.EncodeEmotions(["joy", "fear", "love", "hope", "grief"]);
         var codes  = result.Split('+');
         Assert.True(codes.Length <= 3);
     }
@@ -86,7 +86,7 @@ public sealed class DialectTests
     public void EncodeEmotions_Deduplicates()
     {
         var d      = new Dialect();
-        var result = d.EncodeEmotions(["joy", "joyful"]);
+        var result = Dialect.EncodeEmotions(["joy", "joyful"]);
         // Both map to "joy" — should appear once
         var codes = result.Split('+');
         Assert.Equal(1, codes.Count(c => c == "joy"));
@@ -191,7 +191,7 @@ public sealed class DialectTests
             0:ALC+BOB|chromadb_semantic|"key insight was batching"|determ|TECHNICAL
             """;
 
-        var decoded = d.Decode(aaak);
+        var decoded = Dialect.Decode(aaak);
         Assert.Equal("myproject", decoded.Header.GetValueOrDefault("file", ""));
         Assert.NotEmpty(decoded.Zettels);
     }
@@ -201,7 +201,7 @@ public sealed class DialectTests
     {
         var d     = new Dialect();
         var aaak  = "ARC:fear->hope->joy\n0:ALC|memory|\"test\"|fear";
-        var result = d.Decode(aaak);
+        var result = Dialect.Decode(aaak);
         Assert.Equal("fear->hope->joy", result.Arc);
     }
 
@@ -210,7 +210,7 @@ public sealed class DialectTests
     {
         var d     = new Dialect();
         var aaak  = "T:001<->002|shared_concept\n0:ALC|memory";
-        var result = d.Decode(aaak);
+        var result = Dialect.Decode(aaak);
         Assert.Contains("T:001<->002|shared_concept", result.Tunnels);
     }
 
@@ -218,7 +218,7 @@ public sealed class DialectTests
     public void Decode_EmptyInput_ReturnsEmptyDecoded()
     {
         var d      = new Dialect();
-        var result = d.Decode("");
+        var result = Dialect.Decode("");
         Assert.Empty(result.Arc);
         Assert.Empty(result.Zettels);
         Assert.Empty(result.Tunnels);
@@ -255,7 +255,7 @@ public sealed class DialectTests
         var text = string.Join(' ', Enumerable.Repeat(
             "We decided to use ChromaDB because it has semantic search capabilities.", 10));
         var compressed = d.Compress(text);
-        var stats = d.GetCompressionStats(text, compressed);
+        var stats = Dialect.GetCompressionStats(text, compressed);
 
         Assert.True(stats.SizeRatio > 1.0, $"Expected compression ratio > 1, got {stats.SizeRatio}");
         Assert.Equal(text.Length, stats.OriginalChars);
@@ -270,7 +270,7 @@ public sealed class DialectTests
         var d          = new Dialect();
         var compressed = d.Compress("We decided to use microservices because of scalability.",
             new Dictionary<string, string> { ["wing"] = "arch", ["room"] = "decisions" });
-        var decoded = d.Decode(compressed);
+        var decoded = Dialect.Decode(compressed);
 
         // After decode, either header or zettels should be populated
         Assert.True(decoded.Header.Count > 0 || decoded.Zettels.Count > 0,

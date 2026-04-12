@@ -1,7 +1,6 @@
 using Microsoft.Extensions.AI;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using Chroma.Embeddings;
 using Mempalace.Storage;
@@ -92,7 +91,7 @@ public static class McpTools
                 wings,
                 rooms,
                 palace_path = ctx.PalacePath,
-                backend     = ctx.Backend.ToString(),
+                backend     = ctx.Backend.ToString("G"),
                 protocol    = PalaceProtocol,
                 aaak_dialect = AaakSpec,
             }))!;
@@ -227,11 +226,11 @@ public static class McpTools
             {
                 total = memories.Count,
                 by_type = memories
-                    .GroupBy(m => m.MemoryType.ToString().ToLowerInvariant())
+                    .GroupBy(m => m.MemoryType.ToString("G").ToLowerInvariant())
                     .ToDictionary(g => g.Key, g => g.Count()),
                 memories = memories.Select(m => new
                 {
-                    memory_type = m.MemoryType.ToString().ToLowerInvariant(),
+                    memory_type = m.MemoryType.ToString("G").ToLowerInvariant(),
                     chunk_index = m.ChunkIndex,
                     content     = m.Content,
                 }),
@@ -266,7 +265,7 @@ public static class McpTools
         {
             var dialect    = new Dialect();
             var compressed = dialect.Compress(text, metadata);
-            var stats      = dialect.GetCompressionStats(text, compressed);
+            var stats      = Dialect.GetCompressionStats(text, compressed);
             return JsonNode.Parse(JsonSerializer.Serialize(new
             {
                 compressed,
@@ -418,7 +417,7 @@ public static class McpTools
         {
             var wing = $"wing_{agentName.ToLowerInvariant().Replace(' ', '_')}";
             var now  = DateTime.UtcNow;
-            var seed = Encoding.UTF8.GetBytes(agentName + now.ToString("O"));
+            var seed = Encoding.UTF8.GetBytes(agentName + now.ToString("O", CultureInfo.InvariantCulture));
             var hash = Convert.ToHexString(SHA256.HashData(seed)).ToLowerInvariant()[..16];
             var id   = $"diary_{wing}_{now:yyyyMMdd_HHmmss}_{hash}";
 
@@ -435,8 +434,8 @@ public static class McpTools
                     ["topic"]      = topic,
                     ["type"]       = "diary_entry",
                     ["agent"]      = agentName,
-                    ["filed_at"]   = now.ToString("O"),
-                    ["date"]       = now.ToString("yyyy-MM-dd"),
+                    ["filed_at"]   = now.ToString("O", CultureInfo.InvariantCulture),
+                    ["date"]       = now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                     ["source_file"] = "",
                     ["chunk_index"] = 0L,
                     ["added_by"]   = "mcp",

@@ -21,7 +21,7 @@ public sealed class Dialect
 {
     // ── Emotion codes ─────────────────────────────────────────────────────────
 
-    private static readonly IReadOnlyDictionary<string, string> EmotionCodes =
+    private static readonly Dictionary<string, string> EmotionCodes =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["vulnerability"] = "vul", ["vulnerable"] = "vul",
@@ -55,7 +55,7 @@ public sealed class Dialect
             ["surprise"] = "surprise",
         };
 
-    private static readonly IReadOnlyDictionary<string, string> EmotionSignals =
+    private static readonly Dictionary<string, string> EmotionSignals =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["decided"] = "determ", ["prefer"] = "convict", ["worried"] = "anx",
@@ -68,7 +68,7 @@ public sealed class Dialect
             ["disappoint"] = "grief", ["concern"] = "anx",
         };
 
-    private static readonly IReadOnlyDictionary<string, string> FlagSignals =
+    private static readonly Dictionary<string, string> FlagSignals =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["decided"] = "DECISION", ["chose"] = "DECISION",
@@ -92,7 +92,7 @@ public sealed class Dialect
             ["config"] = "TECHNICAL",
         };
 
-    private static readonly IReadOnlySet<string> StopWords = new HashSet<string>(
+    private static readonly HashSet<string> StopWords = new HashSet<string>(
         StringComparer.OrdinalIgnoreCase)
     {
         "the","a","an","is","are","was","were","be","been","being","have","has","had",
@@ -141,7 +141,7 @@ public sealed class Dialect
 
     public string? EncodeEntity(string name)
     {
-        if (_skipNames.Any(s => name.ToLowerInvariant().Contains(s))) return null;
+        if (_skipNames.Any(s => name.Contains(s, StringComparison.OrdinalIgnoreCase))) return null;
         if (_entityCodes.TryGetValue(name, out var code)) return code;
         // Prefix/substring match
         foreach (var (key, val) in _entityCodes)
@@ -150,7 +150,7 @@ public sealed class Dialect
         return name[..Math.Min(3, name.Length)].ToUpperInvariant();
     }
 
-    public string EncodeEmotions(IReadOnlyList<string> emotions)
+    public static string EncodeEmotions(IReadOnlyList<string> emotions)
     {
         var codes = new List<string>();
         foreach (var e in emotions)
@@ -198,7 +198,7 @@ public sealed class Dialect
         if (source.Length > 0 || wing.Length > 0)
         {
             var stem = source.Length > 0 ? Path.GetFileNameWithoutExtension(source) : "?";
-            sb.AppendLine($"{(wing.Length > 0 ? wing : "?")}|{(room.Length > 0 ? room : "?")}|{(date.Length > 0 ? date : "?")}|{stem}");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"{(wing.Length > 0 ? wing : "?")}|{(room.Length > 0 ? room : "?")}|{(date.Length > 0 ? date : "?")}|{stem}");
         }
 
         // Content line
@@ -214,7 +214,7 @@ public sealed class Dialect
     // ── Decoding ──────────────────────────────────────────────────────────────
 
     /// <summary>Parse an AAAK string back into a structured summary.</summary>
-    public AaakDecoded Decode(string dialectText)
+    public static AaakDecoded Decode(string dialectText)
     {
         var lines   = dialectText.Trim().Split('\n');
         var header  = new Dictionary<string, string>();
@@ -224,9 +224,9 @@ public sealed class Dialect
 
         foreach (var line in lines)
         {
-            if (line.StartsWith("ARC:"))
+            if (line.StartsWith("ARC:", StringComparison.Ordinal))
                 arc = line[4..];
-            else if (line.StartsWith("T:"))
+            else if (line.StartsWith("T:", StringComparison.Ordinal))
                 tunnels.Add(line);
             else if (line.Contains('|') && line.Contains(':')
                      && line.Split('|')[0].Contains(':'))
@@ -252,7 +252,7 @@ public sealed class Dialect
         return Math.Max(1, (int)(words.Length * 1.3));
     }
 
-    public CompressionStats GetCompressionStats(string original, string compressed) => new(
+    public static CompressionStats GetCompressionStats(string original, string compressed) => new(
         CountTokens(original),
         CountTokens(compressed),
         Math.Round((double)CountTokens(original) / Math.Max(CountTokens(compressed), 1), 1),
@@ -261,7 +261,7 @@ public sealed class Dialect
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    private IReadOnlyList<string> DetectEmotions(string text)
+    private static List<string> DetectEmotions(string text)
     {
         var lower   = text.ToLowerInvariant();
         var found   = new List<string>();
@@ -274,7 +274,7 @@ public sealed class Dialect
         return found.Take(3).ToList();
     }
 
-    private IReadOnlyList<string> DetectFlags(string text)
+    private static List<string> DetectFlags(string text)
     {
         var lower = text.ToLowerInvariant();
         var found = new List<string>();
@@ -287,7 +287,7 @@ public sealed class Dialect
         return found.Take(3).ToList();
     }
 
-    private IReadOnlyList<string> ExtractTopics(string text, int max = 3)
+    private static List<string> ExtractTopics(string text, int max = 3)
     {
         var freq = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
@@ -314,7 +314,7 @@ public sealed class Dialect
             .Take(max).Select(kv => kv.Key).ToList();
     }
 
-    private string ExtractKeySentence(string text)
+    private static string ExtractKeySentence(string text)
     {
         var sentences = SentenceSplitRx.Split(text)
             .Select(s => s.Trim())
@@ -347,7 +347,7 @@ public sealed class Dialect
         return scored.Length > 55 ? scored[..52] + "..." : scored;
     }
 
-    private IReadOnlyList<string> DetectEntitiesInText(string text)
+    private List<string> DetectEntitiesInText(string text)
     {
         var found = new List<string>();
 

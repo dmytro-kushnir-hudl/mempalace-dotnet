@@ -75,10 +75,10 @@ mineCmd.SetAction(async (result, ct) =>
     var embedder = await GetEmbedder();
     if (mode == "convos")
         await ConvoMiner.MineConvosAsync(dir.FullName, palace, embedder,
-            new ConvoMinerOptions(Wing: wing, Agent: agent, Limit: limit, DryRun: dryRun, Backend: backend));
+            new ConvoMinerOptions(Wing: wing, Agent: agent, Limit: limit, DryRun: dryRun, Backend: backend), ct);
     else
         await Miner.MineAsync(dir.FullName, palace, embedder,
-            new MinerOptions(WingOverride: wing, Agent: agent, Limit: limit, DryRun: dryRun, Backend: backend, Parallel: parallel));
+            new MinerOptions(WingOverride: wing, Agent: agent, Limit: limit, DryRun: dryRun, Backend: backend, Parallel: parallel), ct);
 });
 
 rootCmd.Add(mineCmd);
@@ -111,7 +111,7 @@ searchCmd.SetAction(async (result, ct) =>
     var n       = result.GetValue(searchNOpt);
     var backend = result.GetValue(backendOpt);
     var embedder = await GetEmbedder();
-    var response = await Searcher.SearchMemoriesAsync(query, palace, embedder, wing, room, n, backend: backend);
+    var response = await Searcher.SearchMemoriesAsync(query, palace, embedder, wing, room, n, backend: backend, ct: ct);
 
     Console.WriteLine($"\nQuery: \"{query}\"");
     if (wing is not null || room is not null)

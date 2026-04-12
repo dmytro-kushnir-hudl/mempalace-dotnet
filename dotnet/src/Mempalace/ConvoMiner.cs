@@ -1,5 +1,4 @@
 using Microsoft.Extensions.AI;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using Chroma;
 using Chroma.Embeddings;
@@ -249,7 +248,7 @@ public static class ConvoMiner
             : ChunkByParagraph(content);
     }
 
-    private static IReadOnlyList<ConvoChunk> ChunkByExchange(string[] lines)
+    private static List<ConvoChunk> ChunkByExchange(string[] lines)
     {
         var chunks = new List<ConvoChunk>();
         int i = 0;
@@ -278,7 +277,7 @@ public static class ConvoMiner
         return chunks;
     }
 
-    private static IReadOnlyList<ConvoChunk> ChunkByParagraph(string content)
+    private static List<ConvoChunk> ChunkByParagraph(string content)
     {
         var chunks = new List<ConvoChunk>();
         var paras  = content.Split("\n\n").Select(p => p.Trim()).Where(p => p.Length > MinChunkSize).ToList();

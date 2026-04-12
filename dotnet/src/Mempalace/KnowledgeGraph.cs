@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using Microsoft.Data.Sqlite;
 
 namespace Mempalace;
@@ -166,7 +165,7 @@ public sealed class KnowledgeGraph : IDisposable
         var subId  = NormaliseName(subject);
         var predId = NormaliseName(predicate);
         var objId  = NormaliseName(obj);
-        var end    = ended ?? DateTime.UtcNow.ToString("yyyy-MM-dd");
+        var end    = ended ?? DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
         Execute("""
             UPDATE triples SET valid_to = $end
@@ -265,7 +264,7 @@ public sealed class KnowledgeGraph : IDisposable
     // Helpers
     // -------------------------------------------------------------------------
 
-    private IReadOnlyList<KgTriple> QueryTriples(
+    private List<KgTriple> QueryTriples(
         string column, string value, string? asOf, string direction)
     {
         var sql = BuildTemporalQuery($"{column} = $val", asOf);
@@ -298,7 +297,7 @@ public sealed class KnowledgeGraph : IDisposable
         cmd.Parameters.AddWithValue("$asOf", asOf);
     }
 
-    private static IReadOnlyList<KgTriple> ReadTriples(SqliteCommand cmd, string direction)
+    private static List<KgTriple> ReadTriples(SqliteCommand cmd, string direction)
     {
         var list = new List<KgTriple>();
         using var rdr = cmd.ExecuteReader();
@@ -323,7 +322,7 @@ public sealed class KnowledgeGraph : IDisposable
     {
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = sql;
-        return Convert.ToInt32(cmd.ExecuteScalar());
+        return Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
     }
 
     private void Execute(string sql, params (string Name, object? Value)[] parameters)

@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace Mempalace;
@@ -60,7 +59,7 @@ public static async Task RunAsync(McpToolContext ctx,
         finally
         {
             if (ownReader) reader.Dispose();
-            if (ownWriter) { await writer.FlushAsync(); writer.Dispose(); }
+            if (ownWriter) { await writer.FlushAsync(ct); writer.Dispose(); }
         }
     }
 
@@ -84,7 +83,7 @@ public static async Task RunAsync(McpToolContext ctx,
         };
     }
 
-    private static JsonNode Initialize(JsonNode? id, JsonNode? params_)
+    private static JsonObject Initialize(JsonNode? id, JsonNode? params_)
     {
         var clientVer  = params_?["protocolVersion"]?.GetValue<string>() ?? SupportedVersions[^1];
         var negotiated = Array.IndexOf(SupportedVersions, clientVer) >= 0
@@ -98,7 +97,7 @@ public static async Task RunAsync(McpToolContext ctx,
         });
     }
 
-    private static JsonNode ToolsList(JsonNode? id) => Ok(id, new JsonObject
+    private static JsonObject ToolsList(JsonNode? id) => Ok(id, new JsonObject
     {
         ["tools"] = JsonNode.Parse(JsonSerializer.Serialize(ToolDefinitions()))!,
     });

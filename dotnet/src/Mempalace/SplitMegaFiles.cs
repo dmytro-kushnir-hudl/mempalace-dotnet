@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Text.Json.Nodes;
 
@@ -41,7 +40,7 @@ public static class SplitMegaFiles
     private static readonly Regex SafeNamePattern = new(
         @"[^\w\.\-]", RegexOptions.Compiled);
 
-    private static readonly IReadOnlyDictionary<string, string> MonthMap =
+    private static readonly Dictionary<string, string> MonthMap =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["January"]="01",["February"]="02",["March"]="03",["April"]="04",
@@ -210,7 +209,7 @@ public static class SplitMegaFiles
     {
         foreach (var line in chunk)
         {
-            if (!line.StartsWith("> ")) continue;
+            if (!line.StartsWith("> ", StringComparison.Ordinal)) continue;
             var prompt = line[2..].Trim();
             if (prompt.Length <= 5 || SkipPromptPattern.IsMatch(prompt)) continue;
 
@@ -226,10 +225,10 @@ public static class SplitMegaFiles
     private static readonly string KnownNamesPath =
         Path.Combine(Constants.DefaultConfigDir, "known_names.json");
 
-    private static readonly string[] FallbackKnownPeople =
+    private static readonly List<string> FallbackKnownPeople =
         ["Alice", "Ben", "Riley", "Max", "Sam", "Devon", "Jordan"];
 
-    private static IReadOnlyList<string> LoadKnownPeople()
+    private static List<string> LoadKnownPeople()
     {
         if (!File.Exists(KnownNamesPath)) return FallbackKnownPeople;
         try
@@ -247,7 +246,7 @@ public static class SplitMegaFiles
         return FallbackKnownPeople;
     }
 
-    private static IReadOnlyDictionary<string, string> LoadUsernameMap()
+    private static Dictionary<string, string> LoadUsernameMap()
     {
         if (!File.Exists(KnownNamesPath)) return new Dictionary<string, string>();
         try

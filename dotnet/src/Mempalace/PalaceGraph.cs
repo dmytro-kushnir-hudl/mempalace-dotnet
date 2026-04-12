@@ -239,7 +239,7 @@ public static class PalaceGraph
         return FindTunnelsFromNodes(nodes, wingA, wingB);
     }
 
-    private static IReadOnlyList<TunnelResult> FindTunnelsFromNodes(
+    private static List<TunnelResult> FindTunnelsFromNodes(
         IReadOnlyDictionary<string, RoomNode> nodes, string? wingA, string? wingB)
     {
         return nodes.Values
@@ -248,7 +248,7 @@ public static class PalaceGraph
                 && (wingB is null || n.Wings.Contains(wingB)))
             .Select(n => new TunnelResult(
                 n.Room, n.Wings, n.Halls, n.Count,
-                n.RecentDates.FirstOrDefault() ?? ""))
+                n.RecentDates.Count > 0 ? n.RecentDates[0] : ""))
             .OrderByDescending(t => t.Count)
             .Take(50)
             .ToList();
@@ -297,7 +297,7 @@ public static class PalaceGraph
 
     // ── Fuzzy match ───────────────────────────────────────────────────────────
 
-    private static IReadOnlyList<string> FuzzyMatch(string query, IEnumerable<string> rooms)
+    private static List<string> FuzzyMatch(string query, IEnumerable<string> rooms)
     {
         var q = query.ToLowerInvariant();
         return rooms

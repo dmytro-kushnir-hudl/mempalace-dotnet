@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
@@ -32,7 +31,7 @@ public static class HooksCli
         "appropriate categories. Use verbatim quotes where possible. Save " +
         "everything, then allow compaction to proceed.";
 
-    private static readonly IReadOnlySet<string> SupportedHarnesses =
+    private static readonly HashSet<string> SupportedHarnesses =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         { "claude-code", "codex" };
 
@@ -114,7 +113,7 @@ public static class HooksCli
         int lastSave = 0;
         if (File.Exists(lastSaveFile))
         {
-            try { lastSave = int.Parse(File.ReadAllText(lastSaveFile).Trim()); }
+            try { lastSave = int.Parse(File.ReadAllText(lastSaveFile).Trim(), CultureInfo.InvariantCulture); }
             catch { lastSave = 0; }
         }
 
@@ -123,7 +122,7 @@ public static class HooksCli
 
         if (sinceLast >= SaveInterval && exchangeCount > 0)
         {
-            try { File.WriteAllText(lastSaveFile, exchangeCount.ToString()); }
+            try { File.WriteAllText(lastSaveFile, exchangeCount.ToString(CultureInfo.InvariantCulture)); }
             catch { /* best effort */ }
 
             Log($"TRIGGERING SAVE at exchange {exchangeCount}");
@@ -202,7 +201,7 @@ public static class HooksCli
         {
             Directory.CreateDirectory(StateDir);
             var logPath = Path.Combine(StateDir, "hook.log");
-            var ts      = DateTime.Now.ToString("HH:mm:ss");
+            var ts      = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
             File.AppendAllText(logPath, $"[{ts}] {message}{Environment.NewLine}");
         }
         catch { /* best effort */ }
@@ -211,7 +210,7 @@ public static class HooksCli
     private static void Output(TextWriter writer, JsonObject data)
     {
         writer.WriteLine(JsonSerializer.Serialize(data,
-            new JsonSerializerOptions { WriteIndented = true }));
+            Json.Indented));
     }
 
     private static string SanitizeSessionId(string id)

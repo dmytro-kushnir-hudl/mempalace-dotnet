@@ -103,7 +103,7 @@ public sealed class Layer1
         int totalChars = 0;
         foreach (var group in byRoom)
         {
-            sb.AppendLine($"## {group.Key}");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"## {group.Key}");
             foreach (var (doc, _, _) in group)
             {
                 if (totalChars + doc.Length > MaxChars) goto done;
@@ -162,7 +162,7 @@ public sealed class Layer2
         {
             var r = row.Metadata?.GetValueOrDefault("room") as string ?? "";
             if (row.Document is null) continue;
-            sb.AppendLine($"[{r}] {row.Document}");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"[{r}] {row.Document}");
             sb.AppendLine();
         }
         return sb.ToString().Trim();
@@ -200,7 +200,7 @@ public sealed class Layer3
         var sb = new StringBuilder();
         foreach (var hit in response.Results)
         {
-            sb.AppendLine($"[{hit.Wing}/{hit.Room}] (sim={hit.Similarity:F3}) {hit.Text}");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"[{hit.Wing}/{hit.Room}] (sim={hit.Similarity:F3}) {hit.Text}");
             sb.AppendLine();
         }
         return sb.ToString().Trim();

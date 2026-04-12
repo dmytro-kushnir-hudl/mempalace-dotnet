@@ -22,7 +22,7 @@ public static class RoomDetector
 {
     // ── Folder → room mapping (80+ patterns) ─────────────────────────────────
 
-    private static readonly IReadOnlyDictionary<string, string> FolderRoomMap =
+    private static readonly Dictionary<string, string> FolderRoomMap =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["frontend"]      = "frontend",  ["front-end"]    = "frontend",

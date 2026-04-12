@@ -180,23 +180,21 @@ public static class Miner
         // 1. Folder path matches room name or keyword
         foreach (var room in rooms)
         {
-            var rName = room.Name.ToLowerInvariant();
-            if (pathParts.Any(p => p == rName)) return room.Name;
-            if (room.Keywords.Any(k => pathParts.Any(p => p.Contains(k.ToLowerInvariant()))))
+            if (pathParts.Any(p => p.Equals(room.Name, StringComparison.OrdinalIgnoreCase))) return room.Name;
+            if (room.Keywords.Any(k => pathParts.Any(p => p.Contains(k, StringComparison.OrdinalIgnoreCase))))
                 return room.Name;
         }
 
         // 2. Filename matches
         foreach (var room in rooms)
         {
-            if (filename.Contains(room.Name.ToLowerInvariant())) return room.Name;
-            if (room.Keywords.Any(k => filename.Contains(k.ToLowerInvariant()))) return room.Name;
+            if (filename.Contains(room.Name, StringComparison.OrdinalIgnoreCase)) return room.Name;
+            if (room.Keywords.Any(k => filename.Contains(k, StringComparison.OrdinalIgnoreCase))) return room.Name;
         }
 
         // 3. Content keyword scoring
-        var lower  = content.ToLowerInvariant();
         var scores = rooms
-            .Select(r => (Room: r, Score: r.Keywords.Count(k => lower.Contains(k.ToLowerInvariant()))))
+            .Select(r => (Room: r, Score: r.Keywords.Count(k => content.Contains(k, StringComparison.OrdinalIgnoreCase))))
             .Where(x => x.Score > 0)
             .OrderByDescending(x => x.Score)
             .FirstOrDefault();

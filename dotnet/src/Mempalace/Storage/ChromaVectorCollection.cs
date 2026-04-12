@@ -121,7 +121,7 @@ public sealed class ChromaVectorCollection : IVectorCollection
             var mtime = mt switch {
                 double d => d,
                 System.Text.Json.JsonElement je => je.GetDouble(),
-                _ => Convert.ToDouble(mt)
+                _ => Convert.ToDouble(mt, CultureInfo.InvariantCulture)
             };
             if (!result.TryGetValue(path, out var existing) || mtime > existing)
                 result[path] = mtime;

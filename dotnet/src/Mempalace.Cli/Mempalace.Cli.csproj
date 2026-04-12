@@ -7,6 +7,8 @@
         <AssemblyName>mempalace-dotnet</AssemblyName>
         <RootNamespace>Mempalace.Cli</RootNamespace>
         <Version>0.1.0</Version>
+        <EnableNETAnalyzers>true</EnableNETAnalyzers>
+        <AnalysisLevel>latest-recommended</AnalysisLevel>
     </PropertyGroup>
 
     <ItemGroup>

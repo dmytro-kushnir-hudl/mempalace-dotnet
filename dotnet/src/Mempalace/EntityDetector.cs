@@ -81,7 +81,7 @@ public static class EntityDetector
 
     // ── Stopwords ─────────────────────────────────────────────────────────────
 
-    private static readonly IReadOnlySet<string> Stopwords = new HashSet<string>(
+    private static readonly HashSet<string> Stopwords = new HashSet<string>(
         StringComparer.OrdinalIgnoreCase)
     {
         "the","a","an","and","or","but","in","on","at","to","for","of","with","by",
@@ -116,7 +116,7 @@ public static class EntityDetector
 
     // ── Prose-only extensions (fewer false positives) ─────────────────────────
 
-    private static readonly IReadOnlySet<string> ProseExtensions =
+    private static readonly HashSet<string> ProseExtensions =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         { ".txt", ".md", ".rst", ".csv" };
 
@@ -248,17 +248,17 @@ public static class EntityDetector
         // Dialogue markers (strong — 3x each)
         foreach (var tpl in DialogueTemplates)
         {
-            var rx = new Regex(string.Format(tpl, n),
+            var rx = new Regex(string.Format(CultureInfo.InvariantCulture, tpl, n),
                 RegexOptions.Multiline | RegexOptions.IgnoreCase);
-            int m = rx.Matches(text).Count;
+            int m = rx.Count(text);
             if (m > 0) { ps += m * 3; psig.Add($"dialogue marker ({m}x)"); }
         }
 
         // Person verb patterns (2x each)
         foreach (var tpl in PersonVerbTemplates)
         {
-            var rx = new Regex(string.Format(tpl, n), RegexOptions.IgnoreCase);
-            int m = rx.Matches(text).Count;
+            var rx = new Regex(string.Format(CultureInfo.InvariantCulture, tpl, n), RegexOptions.IgnoreCase);
+            int m = rx.Count(text);
             if (m > 0) { ps += m * 2; psig.Add($"'{name} …' action ({m}x)"); }
         }
 
@@ -283,26 +283,26 @@ public static class EntityDetector
         // Direct address (4x each)
         var directRx = new Regex(
             $@"\bhey\s+{n}\b|\bthanks?\s+{n}\b|\bhi\s+{n}\b", RegexOptions.IgnoreCase);
-        int direct = directRx.Matches(text).Count;
+        int direct = directRx.Count(text);
         if (direct > 0) { ps += direct * 4; psig.Add($"addressed directly ({direct}x)"); }
 
         // Project verb patterns (2x each)
         foreach (var tpl in ProjectVerbTemplates)
         {
-            var rx = new Regex(string.Format(tpl, n), RegexOptions.IgnoreCase);
-            int m = rx.Matches(text).Count;
+            var rx = new Regex(string.Format(CultureInfo.InvariantCulture, tpl, n), RegexOptions.IgnoreCase);
+            int m = rx.Count(text);
             if (m > 0) { prs += m * 2; prsig.Add($"project verb ({m}x)"); }
         }
 
         // Versioned/hyphenated (3x)
         var versionedRx = new Regex($@"\b{n}[-v]\w+", RegexOptions.IgnoreCase);
-        int versioned = versionedRx.Matches(text).Count;
+        int versioned = versionedRx.Count(text);
         if (versioned > 0) { prs += versioned * 3; prsig.Add($"versioned ({versioned}x)"); }
 
         // Code file reference (3x)
         var codeRefRx = new Regex(
             $@"\b{n}\.(py|js|ts|yaml|yml|json|sh)\b", RegexOptions.IgnoreCase);
-        int codeRef = codeRefRx.Matches(text).Count;
+        int codeRef = codeRefRx.Count(text);
         if (codeRef > 0) { prs += codeRef * 3; prsig.Add($"code file ref ({codeRef}x)"); }
 
         return (ps, prs, psig, prsig);
