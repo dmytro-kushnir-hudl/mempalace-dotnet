@@ -19,7 +19,8 @@ public sealed record MinerOptions(
     bool DryRun = false,
     bool RespectGitignore = true,
     IReadOnlyList<string>? IncludeIgnored = null,
-    VectorBackend Backend = VectorBackend.Chroma);
+    VectorBackend Backend = VectorBackend.Sqlite,
+    bool Parallel = false);
 
 // ---------------------------------------------------------------------------
 // Miner
@@ -34,16 +35,16 @@ public static class Miner
     public static IReadOnlyList<Chunk> ChunkText(string content)
     {
         var chunks = new List<Chunk>();
-        int start = 0;
+        var span   = content.AsSpan();
+        int start  = 0;
 
-        while (start < content.Length)
+        while (start < span.Length)
         {
-            int end = Math.Min(start + Constants.ChunkSize, content.Length);
+            int end = Math.Min(start + Constants.ChunkSize, span.Length);
 
-            if (end < content.Length)
+            if (end < span.Length)
             {
-                // Try double-newline break first (paragraph boundary)
-                int half = start + Constants.ChunkSize / 2;
+                int half    = start + Constants.ChunkSize / 2;
                 int breakAt = content.LastIndexOf("\n\n", end, end - half, StringComparison.Ordinal);
                 if (breakAt == -1)
                     breakAt = content.LastIndexOf('\n', end, end - half);
@@ -51,11 +52,12 @@ public static class Miner
                     end = breakAt + 1;
             }
 
-            var chunk = content[start..end].Trim();
-            if (chunk.Length >= Constants.MinChunkSize)
-                chunks.Add(new Chunk(chunk, chunks.Count));
+            // Trim via span — single allocation only if non-empty
+            var slice = span[start..end].Trim();
+            if (slice.Length >= Constants.MinChunkSize)
+                chunks.Add(new Chunk(new string(slice), chunks.Count));
 
-            start = end < content.Length ? end - Constants.ChunkOverlap : end;
+            start = end < span.Length ? end - Constants.ChunkOverlap : end;
         }
 
         return chunks;
@@ -112,6 +114,11 @@ public static class Miner
     private record PendingChunk(string Wing, string Room, string Content,
         string SourceFile, int ChunkIndex, string Agent, double Mtime);
 
+    private static readonly System.Buffers.ArrayPool<string> StringPool =
+        System.Buffers.ArrayPool<string>.Shared;
+    private static readonly System.Buffers.ArrayPool<Dictionary<string, object?>> MetaPool =
+        System.Buffers.ArrayPool<Dictionary<string, object?>>.Shared;
+
     private static async Task FlushBatchAsync(
         IVectorCollection collection,
         IEmbeddingGenerator<string, Embedding<float>> embedder,
@@ -119,28 +126,39 @@ public static class Miner
         CancellationToken ct)
     {
         if (batch.Count == 0) return;
+        int n   = batch.Count;
         var now = DateTime.UtcNow.ToString("O");
-        var ids  = new string[batch.Count];
-        var docs = new string[batch.Count];
-        var metas = new Dictionary<string, object?>[batch.Count];
-        for (int i = 0; i < batch.Count; i++)
+        var ids   = StringPool.Rent(n);
+        var docs  = StringPool.Rent(n);
+        var metas = MetaPool.Rent(n);
+        try
         {
-            var c = batch[i];
-            ids[i]   = DrawerId(c.Wing, c.Room, c.SourceFile, c.ChunkIndex);
-            docs[i]  = c.Content;
-            metas[i] = new Dictionary<string, object?>
+            for (int i = 0; i < n; i++)
             {
-                ["wing"]         = c.Wing,
-                ["room"]         = c.Room,
-                ["source_file"]  = c.SourceFile,
-                ["chunk_index"]  = (long)c.ChunkIndex,
-                ["added_by"]     = c.Agent,
-                ["filed_at"]     = now,
-                ["source_mtime"] = c.Mtime,
-            };
+                var c = batch[i];
+                ids[i]   = DrawerId(c.Wing, c.Room, c.SourceFile, c.ChunkIndex);
+                docs[i]  = c.Content;
+                metas[i] = new Dictionary<string, object?>(7)
+                {
+                    ["wing"]         = c.Wing,
+                    ["room"]         = c.Room,
+                    ["source_file"]  = c.SourceFile,
+                    ["chunk_index"]  = (long)c.ChunkIndex,
+                    ["added_by"]     = c.Agent,
+                    ["filed_at"]     = now,
+                    ["source_mtime"] = c.Mtime,
+                };
+            }
+            // UpsertAsync only reads [0..n), rented arrays may be larger — pass exact slices
+            await collection.UpsertAsync(ids[..n], docs[..n], embedder, metas[..n], ct).ConfigureAwait(false);
         }
-        await collection.UpsertAsync(ids, docs, embedder, metas, ct).ConfigureAwait(false);
-        batch.Clear();
+        finally
+        {
+            StringPool.Return(ids, clearArray: true);
+            StringPool.Return(docs, clearArray: true);
+            MetaPool.Return(metas, clearArray: true);
+            batch.Clear();
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -190,7 +208,7 @@ public static class Miner
     // Mine — main entry point
     // -------------------------------------------------------------------------
 
-    public static async Task MineAsync(
+    public static Task MineAsync(
         string projectDir,
         string palacePath,
         IEmbeddingGenerator<string, Embedding<float>> embedder,
@@ -198,18 +216,125 @@ public static class Miner
         CancellationToken ct = default)
     {
         options ??= new MinerOptions();
-        projectDir = Path.GetFullPath(projectDir);
+        return options.Parallel
+            ? MineAsyncPipelined(projectDir, palacePath, embedder, options, ct)
+            : MineAsyncSerial(projectDir, palacePath, embedder, options, ct);
+    }
 
+    private static async Task MineAsyncPipelined(
+        string projectDir,
+        string palacePath,
+        IEmbeddingGenerator<string, Embedding<float>> embedder,
+        MinerOptions options,
+        CancellationToken ct)
+    {
+        projectDir = Path.GetFullPath(projectDir);
+        var (wing, rooms) = ResolveWingAndRooms(projectDir, options);
+        using var session = PalaceSession.Open(palacePath, backend: options.Backend);
+        var minedMtimes   = options.DryRun ? [] : session.Collection.LoadMinedMtimes();
+        var progress      = new MineProgress(projectDir);
+
+        // Channel: producer writes batches, consumer embeds+writes
+        var channel = System.Threading.Channels.Channel.CreateBounded<(List<PendingChunk> batch, bool last)>(
+            new System.Threading.Channels.BoundedChannelOptions(4)
+            { SingleReader = true, SingleWriter = true, FullMode = System.Threading.Channels.BoundedChannelFullMode.Wait });
+
+        int skipped = 0;
+
+        // Producer: enumerate files, read, chunk, fill batches
+        var producer = Task.Run(async () =>
+        {
+            var batch = new List<PendingChunk>(BatchSize);
+            int mined = 0;
+
+            foreach (var file in EnumerateMineable(projectDir, options))
+            {
+                ct.ThrowIfCancellationRequested();
+
+                if (!options.DryRun)
+                {
+                    var currentMtime = PalaceSession.GetUnixMtime(file);
+                    if (minedMtimes.TryGetValue(file, out var stored) && Math.Abs(stored - currentMtime) < 0.001)
+                    {
+                        progress.File(file, skipped: true);
+                        Interlocked.Increment(ref skipped);
+                        continue;
+                    }
+                }
+
+                string content;
+                double fileMtime;
+                try
+                {
+                    var info = new FileInfo(file);
+                    if (info.Length > Constants.MaxFileSize) continue;
+                    fileMtime = (info.LastWriteTimeUtc - DateTime.UnixEpoch).TotalSeconds;
+                    content   = await File.ReadAllTextAsync(file, ct).ConfigureAwait(false);
+                }
+                catch { continue; }
+
+                if (string.IsNullOrWhiteSpace(content)) continue;
+
+                var room   = DetectRoom(file, content, rooms, projectDir);
+                var chunks = ChunkText(content);
+                progress.File(file, skipped: false);
+
+                foreach (var chunk in chunks)
+                {
+                    if (options.DryRun) { Console.WriteLine($"[dry-run] {wing}/{room} chunk {chunk.ChunkIndex}: {file}"); continue; }
+                    progress.Chunk();
+                    batch.Add(new PendingChunk(wing, room, chunk.Content, file, chunk.ChunkIndex, options.Agent, fileMtime));
+                    if (batch.Count >= BatchSize)
+                    {
+                        await channel.Writer.WriteAsync((batch, false), ct).ConfigureAwait(false);
+                        batch = new List<PendingChunk>(BatchSize);
+                    }
+                }
+
+                mined++;
+                if (options.Limit > 0 && mined >= options.Limit) break;
+            }
+
+            if (batch.Count > 0)
+                await channel.Writer.WriteAsync((batch, false), ct).ConfigureAwait(false);
+
+            channel.Writer.Complete();
+        }, ct);
+
+        // Consumer: embed + write batches as they arrive
+        int minedConsumer = 0;
+        await foreach (var (batch, _) in channel.Reader.ReadAllAsync(ct))
+        {
+            await FlushBatchAsync(session.Collection, embedder, batch, ct).ConfigureAwait(false);
+            progress.Flushed(batch.Count);
+            minedConsumer++;
+        }
+
+        await producer.ConfigureAwait(false); // propagate producer exceptions
+        progress.Done(minedConsumer, skipped, wing);
+    }
+
+    private static (string Wing, IReadOnlyList<RoomConfig> Rooms) ResolveWingAndRooms(string projectDir, MinerOptions options)
+    {
         var projectConfig = ProjectConfig.TryLoad(projectDir);
-        var wing  = options.WingOverride
-            ?? projectConfig?.Wing
-            ?? Path.GetFileName(projectDir);
-        var rooms = projectConfig?.Rooms
+        var wing  = options.WingOverride ?? projectConfig?.Wing ?? Path.GetFileName(projectDir);
+        var rooms = (IReadOnlyList<RoomConfig>)(projectConfig?.Rooms
             ?? Constants.DefaultHallKeywords
                 .Select(kv => new RoomConfig(kv.Key, null, (IReadOnlyList<string>)kv.Value))
                 .Append(RoomConfig.General)
-                .ToList<RoomConfig>();
+                .ToList<RoomConfig>());
+        return (wing, rooms);
+    }
 
+    private static async Task MineAsyncSerial(
+        string projectDir,
+        string palacePath,
+        IEmbeddingGenerator<string, Embedding<float>> embedder,
+        MinerOptions options,
+        CancellationToken ct)
+    {
+        projectDir = Path.GetFullPath(projectDir);
+        var (wing, rooms) = ResolveWingAndRooms(projectDir, options);
         using var session = PalaceSession.Open(palacePath, backend: options.Backend);
 
         // Bulk-load already-mined mtimes in one query instead of per-file queries

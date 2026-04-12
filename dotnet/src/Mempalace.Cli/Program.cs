@@ -45,7 +45,8 @@ var mineModeOpt  = new Option<string>("--mode", [])     { Description = "Mining 
 var mineWingOpt  = new Option<string?>("--wing", [])    { Description = "Wing override" };
 var mineAgentOpt = new Option<string>("--agent", [])    { Description = "Agent name" };
 var mineLimitOpt = new Option<int>("--limit", [])       { Description = "Max files (0 = all)" };
-var mineDryOpt   = new Option<bool>("--dry-run", [])    { Description = "Preview without writing" };
+var mineDryOpt      = new Option<bool>("--dry-run", [])    { Description = "Preview without writing" };
+var mineParallelOpt = new Option<bool>("--parallel", [])  { Description = "Pipeline I/O and embedding for higher throughput" };
 
 mineModeOpt.DefaultValueFactory  = _ => "files";
 mineWingOpt.DefaultValueFactory  = _ => null;
@@ -58,6 +59,7 @@ mineCmd.Add(mineWingOpt);
 mineCmd.Add(mineAgentOpt);
 mineCmd.Add(mineLimitOpt);
 mineCmd.Add(mineDryOpt);
+mineCmd.Add(mineParallelOpt);
 
 mineCmd.SetAction(async (result, ct) =>
 {
@@ -67,15 +69,16 @@ mineCmd.SetAction(async (result, ct) =>
     var wing    = result.GetValue(mineWingOpt);
     var agent   = result.GetValue(mineAgentOpt) ?? "mempalace";
     var limit   = result.GetValue(mineLimitOpt);
-    var dryRun  = result.GetValue(mineDryOpt);
-    var backend = result.GetValue(backendOpt);
+    var dryRun   = result.GetValue(mineDryOpt);
+    var parallel = result.GetValue(mineParallelOpt);
+    var backend  = result.GetValue(backendOpt);
     var embedder = await GetEmbedder();
     if (mode == "convos")
         await ConvoMiner.MineConvosAsync(dir.FullName, palace, embedder,
             new ConvoMinerOptions(Wing: wing, Agent: agent, Limit: limit, DryRun: dryRun, Backend: backend));
     else
         await Miner.MineAsync(dir.FullName, palace, embedder,
-            new MinerOptions(WingOverride: wing, Agent: agent, Limit: limit, DryRun: dryRun, Backend: backend));
+            new MinerOptions(WingOverride: wing, Agent: agent, Limit: limit, DryRun: dryRun, Backend: backend, Parallel: parallel));
 });
 
 rootCmd.Add(mineCmd);
