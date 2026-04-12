@@ -570,8 +570,6 @@ internal sealed class MineProgress(string root)
     private static readonly string[] Spinner = ["⠋", "⠙", "⠚", "⠞", "⠖", "⠦", "⠴", "⠲", "⠳", "⠵"];
     private static readonly bool IsTty = !Console.IsErrorRedirected;
 
-    private const long WindowTicks = 10 * TimeSpan.TicksPerSecond; // 10-second tumbling window
-
     private readonly Stopwatch _sw = Stopwatch.StartNew();
     private int _chunks;
     private string _current = "";
@@ -579,10 +577,11 @@ internal sealed class MineProgress(string root)
     private int _skipped;
     private int _spin;
 
-    // Tumbling-window rate: (chunksAtWindowStart, ticksAtWindowStart) packed into a long[2]
-    // swapped atomically via CAS when the window expires.
-    private long _windowStartChunks;
-    private long _windowStartTicks = Stopwatch.GetTimestamp();
+    // 10-second sliding window via ring buffer — one slot per second, updated on Flushed()
+    // (Flushed is single-writer: consumer thread in pipelined, main thread in serial)
+    private readonly int[] _ring = new int[10];
+    private int _ringHead;       // index of the current second slot (0..9)
+    private int _ringHeadSecond; // elapsed whole-second when _ringHead was last written
 
     public void File(string path, bool skipped)
     {
@@ -600,7 +599,34 @@ internal sealed class MineProgress(string root)
     {
         _files++;
         _spin = (_spin + 1) % Spinner.Length;
+        AdvanceRing(count);
         Render();
+    }
+
+    private void AdvanceRing(int count)
+    {
+        var currentSecond = (int)_sw.Elapsed.TotalSeconds;
+        var delta = currentSecond - _ringHeadSecond;
+
+        if (delta > 0)
+        {
+            // Clear up to 10 stale slots as time advances
+            var clears = Math.Min(delta, _ring.Length);
+            for (var i = 1; i <= clears; i++)
+                _ring[(_ringHead + i) % _ring.Length] = 0;
+            _ringHead = currentSecond % _ring.Length;
+            _ringHeadSecond = currentSecond;
+        }
+
+        _ring[_ringHead] += count;
+    }
+
+    private double RingRate()
+    {
+        var sum = 0;
+        foreach (var v in _ring) sum += v;
+        var window = Math.Min(_ringHeadSecond + 1, _ring.Length);
+        return sum / Math.Max(window, 1.0);
     }
 
     public void Done(int mined, int skipped, string wing)
@@ -612,35 +638,12 @@ internal sealed class MineProgress(string root)
             $"avg {avg:0.#}/s  → {wing}");
     }
 
-    private double WindowRate()
-    {
-        var nowTicks  = Stopwatch.GetTimestamp();
-        var nowChunks = (long)_chunks;                          // int read is atomic on 64-bit
-        var winTicks  = Interlocked.Read(ref _windowStartTicks);
-        var winChunks = Interlocked.Read(ref _windowStartChunks);
-        var elapsed   = nowTicks - winTicks;
-
-        if (elapsed >= WindowTicks)
-        {
-            // Window expired — one caller wins the CAS and resets the baseline;
-            // losers fall through and report rate over the just-expired window anyway.
-            if (Interlocked.CompareExchange(ref _windowStartTicks, nowTicks, winTicks) == winTicks)
-                Interlocked.Exchange(ref _windowStartChunks, nowChunks);
-
-            var secs = elapsed / (double)Stopwatch.Frequency;
-            return (nowChunks - winChunks) / Math.Max(secs, 0.001);
-        }
-
-        var windowSecs = elapsed / (double)Stopwatch.Frequency;
-        return (nowChunks - winChunks) / Math.Max(windowSecs, 0.001);
-    }
-
     private void Render()
     {
         if (!IsTty) return;
-        var rate = WindowRate();
+        var rate = RingRate();
+        var avg  = _chunks / Math.Max(_sw.Elapsed.TotalSeconds, 0.001);
         var spin = Spinner[_spin];
-        var avg = _chunks / Math.Max(_sw.Elapsed.TotalSeconds, 0.001);
         var prefix = $"⛏  {spin}  {_files} files  {_skipped} skipped  {_chunks} chunks  {rate:0.#}/s (avg {avg:0.#})  ";
         var width = Math.Max(40, Console.WindowWidth - 1);
         var pathBudget = width - prefix.Length;
