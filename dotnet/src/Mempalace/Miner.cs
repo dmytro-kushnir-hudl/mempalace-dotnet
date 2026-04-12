@@ -335,8 +335,9 @@ public static class Miner
         var minedConsumer = 0;
         await foreach (var (batch, _) in channel.Reader.ReadAllAsync(ct))
         {
+            var flushed = batch.Count;
             await FlushBatchAsync(session.Collection, embedder, batch, ct).ConfigureAwait(false);
-            progress.Flushed(batch.Count);
+            progress.Flushed(flushed);
             minedConsumer++;
         }
 
@@ -441,8 +442,9 @@ public static class Miner
 
         if (batch.Count > 0)
         {
+            var flushed = batch.Count;
             await FlushBatchAsync(session.Collection, embedder, batch, ct).ConfigureAwait(false);
-            progress.Flushed(batch.Count);
+            progress.Flushed(flushed);
         }
 
         if (!options.DryRun)
