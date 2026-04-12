@@ -7,13 +7,14 @@ using Mempalace;
 // Lazy embedder — created on first use, shared across commands
 // ---------------------------------------------------------------------------
 
+bool _useInt8 = false;
 DefaultEmbeddingProvider? _embedder = null;
 async Task<DefaultEmbeddingProvider> GetEmbedder()
 {
     if (_embedder is null)
     {
         Console.Error.WriteLine("Loading embedding model...");
-        _embedder = await DefaultEmbeddingProvider.CreateAsync();
+        _embedder = await DefaultEmbeddingProvider.CreateAsync(useInt8: _useInt8);
     }
     return _embedder;
 }
@@ -32,8 +33,11 @@ palaceOpt.DefaultValueFactory = _ => config.PalacePath;
 var backendOpt = new Option<VectorBackend>("--backend", []) { Description = "Vector store backend: Chroma | Sqlite", Recursive = true };
 backendOpt.DefaultValueFactory = _ => VectorBackend.Sqlite;
 
+var int8Opt = new Option<bool>("--int8", []) { Description = "Use INT8 quantized model (~23 MB, ~3-4x faster inference)", Recursive = true };
+
 rootCmd.Add(palaceOpt);
 rootCmd.Add(backendOpt);
+rootCmd.Add(int8Opt);
 
 // ---------------------------------------------------------------------------
 // mine
@@ -343,6 +347,8 @@ rootCmd.Add(instrCmd);
 // Run
 // ---------------------------------------------------------------------------
 
-var exitCode = await rootCmd.Parse(args).InvokeAsync();
+var parseResult = rootCmd.Parse(args);
+_useInt8 = parseResult.GetValue(int8Opt);
+var exitCode = await parseResult.InvokeAsync();
 _embedder?.Dispose();
 return exitCode;
