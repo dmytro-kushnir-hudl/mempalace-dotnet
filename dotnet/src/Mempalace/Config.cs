@@ -30,7 +30,7 @@ public static class Constants
     public static readonly IReadOnlySet<string> ReadableExtensions =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            ".txt", ".md", ".py", ".js", ".ts", ".jsx", ".tsx", ".json",
+            ".txt", ".md", ".py", ".js", ".ts", ".jsx", ".tsx",
             ".yaml", ".yml", ".html", ".css", ".java", ".go", ".rs", ".rb",
             ".sh", ".csv", ".sql", ".toml", ".cs", ".fs", ".kt", ".swift",
             ".cpp", ".c", ".h", ".hpp", ".csproj", ".fsproj", ".vbproj",
@@ -88,6 +88,10 @@ public sealed record RoomConfig(string Name, string? Description, IReadOnlyList<
 
 public sealed class ProjectConfig
 {
+    [UnconditionalSuppressMessage("AOT", "IL3050",
+        Justification = "YamlDotNet reflection — YAML config is non-critical, fails gracefully")]
+    [UnconditionalSuppressMessage("Trimming", "IL2026",
+        Justification = "YamlDotNet reflection — YAML config is non-critical, fails gracefully")]
     private static readonly IDeserializer YamlDeserializer =
         new DeserializerBuilder()
             .WithNamingConvention(UnderscoredNamingConvention.Instance)
@@ -161,7 +165,7 @@ public sealed class MempalaceConfig
         try
         {
             var json = File.ReadAllText(ConfigFilePath);
-            return JsonSerializer.Deserialize<MempalaceConfig>(json, Json.CaseInsensitive)
+            return JsonSerializer.Deserialize(json, MempalaceConfigContext.Default.MempalaceConfig)
                    ?? new MempalaceConfig();
         }
         catch

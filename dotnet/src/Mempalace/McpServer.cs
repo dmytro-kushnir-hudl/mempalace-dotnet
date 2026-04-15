@@ -122,7 +122,7 @@ public static class McpServer
     {
         return Ok(id, new JsonObject
         {
-            ["tools"] = JsonNode.Parse(JsonSerializer.Serialize(ToolDefinitions()))!
+            ["tools"] = ToolDefinitions()
         });
     }
 
@@ -148,7 +148,7 @@ public static class McpServer
         {
             ["content"] = new JsonArray
             {
-                new JsonObject
+                (JsonNode)new JsonObject
                 {
                     ["type"] = "text",
                     ["text"] = result.ToJsonString(RelaxedJsonOpts)
@@ -218,117 +218,127 @@ public static class McpServer
     // Tool definitions (schema for tools/list)
     // -------------------------------------------------------------------------
 
-    private static IEnumerable<object> ToolDefinitions()
+    private static JsonArray ToolDefinitions()
     {
         return
         [
-            Tool("mempalace_status", "Palace overview — total drawers, wing and room counts", new { }),
-            Tool("mempalace_list_wings", "List all wings with drawer counts", new { }),
+            Tool("mempalace_status", "Palace overview — total drawers, wing and room counts", new JsonObject()),
+            Tool("mempalace_list_wings", "List all wings with drawer counts", new JsonObject()),
             Tool("mempalace_list_rooms", "List rooms within a wing",
-                new { wing = Str("Wing to filter (optional)") }),
-            Tool("mempalace_get_taxonomy", "Full taxonomy: wing → room → drawer count", new { }),
-            Tool("mempalace_get_aaak_spec", "Get the AAAK dialect specification", new { }),
+                new JsonObject { ["wing"] = Str("Wing to filter (optional)") }),
+            Tool("mempalace_get_taxonomy", "Full taxonomy: wing → room → drawer count", new JsonObject()),
+            Tool("mempalace_get_aaak_spec", "Get the AAAK dialect specification", new JsonObject()),
             Tool("mempalace_search", "Semantic search with optional wing/room filter",
-                new
+                new JsonObject
                 {
-                    query = Req(Str("Search query")), limit = Int("Max results (default 5)"), wing = Str("Wing filter"),
-                    room = Str("Room filter")
+                    ["query"] = Str("Search query"),
+                    ["limit"] = Int("Max results (default 5)"),
+                    ["wing"] = Str("Wing filter"),
+                    ["room"] = Str("Room filter")
                 }),
             Tool("mempalace_check_duplicate", "Check if content already exists in the palace",
-                new
+                new JsonObject
                 {
-                    content = Req(Str("Content to check")), threshold = Num("Similarity threshold 0–1 (default 0.9)")
+                    ["content"] = Str("Content to check"),
+                    ["threshold"] = Num("Similarity threshold 0–1 (default 0.9)")
                 }),
             Tool("mempalace_traverse_graph", "BFS room traversal from a starting room",
-                new { start_room = Req(Str("Room to start from")), max_hops = Int("Max hops (default 2)") }),
-            Tool("mempalace_find_tunnels", "Find rooms bridging two wings",
-                new { wing_a = Str("First wing"), wing_b = Str("Second wing") }),
-            Tool("mempalace_graph_stats", "Palace graph overview: rooms, wings, totals", new { }),
-            Tool("mempalace_add_drawer", "File verbatim content into a wing/room",
-                new
+                new JsonObject
                 {
-                    wing = Req(Str("Wing")), room = Req(Str("Room")), content = Req(Str("Verbatim content")),
-                    source_file = Str("Source file (optional)"), added_by = Str("Added by (default: mcp)")
+                    ["start_room"] = Str("Room to start from"),
+                    ["max_hops"] = Int("Max hops (default 2)")
+                }),
+            Tool("mempalace_find_tunnels", "Find rooms bridging two wings",
+                new JsonObject { ["wing_a"] = Str("First wing"), ["wing_b"] = Str("Second wing") }),
+            Tool("mempalace_graph_stats", "Palace graph overview: rooms, wings, totals", new JsonObject()),
+            Tool("mempalace_add_drawer", "File verbatim content into a wing/room",
+                new JsonObject
+                {
+                    ["wing"] = Str("Wing"),
+                    ["room"] = Str("Room"),
+                    ["content"] = Str("Verbatim content"),
+                    ["source_file"] = Str("Source file (optional)"),
+                    ["added_by"] = Str("Added by (default: mcp)")
                 }),
             Tool("mempalace_delete_drawer", "Delete a drawer by ID",
-                new { drawer_id = Req(Str("Drawer ID")) }),
+                new JsonObject { ["drawer_id"] = Str("Drawer ID") }),
             Tool("mempalace_kg_query", "Query the knowledge graph for an entity's relationships",
-                new
+                new JsonObject
                 {
-                    entity = Req(Str("Entity name")), as_of = Str("Date filter YYYY-MM-DD"),
-                    direction = Str("outgoing | incoming | both")
+                    ["entity"] = Str("Entity name"),
+                    ["as_of"] = Str("Date filter YYYY-MM-DD"),
+                    ["direction"] = Str("outgoing | incoming | both")
                 }),
             Tool("mempalace_kg_add", "Add a fact to the knowledge graph",
-                new
+                new JsonObject
                 {
-                    subject = Req(Str("Subject entity")), predicate = Req(Str("Predicate")),
-                    @object = Req(Str("Object entity")), valid_from = Str("Valid from YYYY-MM-DD"),
-                    valid_to = Str("Valid to YYYY-MM-DD"), confidence = Num("Confidence 0–1"),
-                    source_closet = Str("Source drawer ID")
+                    ["subject"] = Str("Subject entity"),
+                    ["predicate"] = Str("Predicate"),
+                    ["object"] = Str("Object entity"),
+                    ["valid_from"] = Str("Valid from YYYY-MM-DD"),
+                    ["valid_to"] = Str("Valid to YYYY-MM-DD"),
+                    ["confidence"] = Num("Confidence 0–1"),
+                    ["source_closet"] = Str("Source drawer ID")
                 }),
             Tool("mempalace_kg_invalidate", "Mark a knowledge graph fact as no longer true",
-                new
+                new JsonObject
                 {
-                    subject = Req(Str("Subject")), predicate = Req(Str("Predicate")), @object = Req(Str("Object")),
-                    ended = Str("End date YYYY-MM-DD")
+                    ["subject"] = Str("Subject"),
+                    ["predicate"] = Str("Predicate"),
+                    ["object"] = Str("Object"),
+                    ["ended"] = Str("End date YYYY-MM-DD")
                 }),
             Tool("mempalace_kg_timeline", "Chronological timeline of knowledge graph facts",
-                new { entity = Str("Entity to filter (optional)") }),
-            Tool("mempalace_kg_stats", "Knowledge graph statistics", new { }),
+                new JsonObject { ["entity"] = Str("Entity to filter (optional)") }),
+            Tool("mempalace_kg_stats", "Knowledge graph statistics", new JsonObject()),
             Tool("mempalace_diary_write", "Write a diary entry in AAAK format",
-                new
+                new JsonObject
                 {
-                    agent_name = Req(Str("Agent name")), entry = Req(Str("Diary entry (AAAK format)")),
-                    topic = Str("Topic tag")
+                    ["agent_name"] = Str("Agent name"),
+                    ["entry"] = Str("Diary entry (AAAK format)"),
+                    ["topic"] = Str("Topic tag")
                 }),
             Tool("mempalace_diary_read", "Read recent diary entries",
-                new { agent_name = Req(Str("Agent name")), last_n = Int("Number of entries (default 10)") }),
+                new JsonObject
+                {
+                    ["agent_name"] = Str("Agent name"),
+                    ["last_n"] = Int("Number of entries (default 10)")
+                }),
             Tool("mempalace_extract_memories",
                 "Extract typed memories (decisions/milestones/problems/preferences/emotional) from text using heuristics — no LLM required",
-                new
+                new JsonObject
                 {
-                    text = Req(Str("Text to extract from")),
-                    min_confidence = Num("Minimum confidence threshold 0–1 (default 0.3)")
+                    ["text"] = Str("Text to extract from"),
+                    ["min_confidence"] = Num("Minimum confidence threshold 0–1 (default 0.3)")
                 }),
             Tool("mempalace_detect_entities", "Detect people and projects mentioned in text",
-                new { text = Req(Str("Text to scan for entities")) }),
+                new JsonObject { ["text"] = Str("Text to scan for entities") }),
             Tool("mempalace_compress",
                 "Compress text to AAAK dialect (lossy summary — entities, topics, key quote, emotions, flags)",
-                new { text = Req(Str("Text to compress")) })
+                new JsonObject { ["text"] = Str("Text to compress") })
         ];
     }
 
     // ── Schema helpers ────────────────────────────────────────────────────────
 
-    private static object Tool(string name, string desc, object props)
+    private static JsonNode Tool(string name, string desc, JsonNode props)
     {
-        return new
+        return new JsonObject
         {
-            name, description = desc,
-            inputSchema = new { type = "object", properties = props }
+            ["name"] = name,
+            ["description"] = desc,
+            ["inputSchema"] = new JsonObject { ["type"] = "object", ["properties"] = props }
         };
     }
 
-    private static object Str(string desc)
-    {
-        return new { type = "string", description = desc };
-    }
+    private static JsonNode Str(string desc)
+        => new JsonObject { ["type"] = "string", ["description"] = desc };
 
-    private static object Int(string desc)
-    {
-        return new { type = "integer", description = desc };
-    }
+    private static JsonNode Int(string desc)
+        => new JsonObject { ["type"] = "integer", ["description"] = desc };
 
-    private static object Num(string desc)
-    {
-        return new { type = "number", description = desc };
-    }
-
-    private static object Req(object schema)
-    {
-        return schema;
-        // required marking is separate in JSON Schema
-    }
+    private static JsonNode Num(string desc)
+        => new JsonObject { ["type"] = "number", ["description"] = desc };
 
     // ── JSON-RPC helpers ──────────────────────────────────────────────────────
 

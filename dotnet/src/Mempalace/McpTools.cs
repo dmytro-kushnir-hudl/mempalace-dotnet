@@ -65,6 +65,8 @@ public static class McpTools
     private static readonly string WalDir = Path.Combine(Constants.DefaultConfigDir, "wal");
     private static readonly string WalFile = Path.Combine(WalDir, "write_log.jsonl");
 
+    [UnconditionalSuppressMessage("Trimming", "IL2026")]
+    [UnconditionalSuppressMessage("AOT", "IL3050")]
     private static void WalLog(string op, object p, object? result = null)
     {
         try
@@ -85,6 +87,20 @@ public static class McpTools
         }
     }
 
+    private static JsonObject DictToJson(IDictionary<string, int> d)
+    {
+        var o = new JsonObject();
+        foreach (var (k, v) in d) o[k] = v;
+        return o;
+    }
+
+    private static JsonObject TaxonomyToJson(IDictionary<string, Dictionary<string, int>> tree)
+    {
+        var o = new JsonObject();
+        foreach (var (k, v) in tree) o[k] = DictToJson(v);
+        return o;
+    }
+
     // ── Status & exploration ─────────────────────────────────────────────────
 
     public static JsonNode Status(McpToolContext ctx)
@@ -94,16 +110,16 @@ public static class McpTools
             using var s = ctx.OpenPalace();
             var count = s.Collection.Count();
             var (wings, rooms) = GetWingsAndRooms(s.Collection);
-            return JsonNode.Parse(JsonSerializer.Serialize(new
+            return new JsonObject
             {
-                total_drawers = count,
-                wings,
-                rooms,
-                palace_path = ctx.PalacePath,
-                backend = ctx.Backend.ToString("G"),
-                protocol = PalaceProtocol,
-                aaak_dialect = AaakSpec
-            }))!;
+                ["total_drawers"] = count,
+                ["wings"] = DictToJson(wings),
+                ["rooms"] = DictToJson(rooms),
+                ["palace_path"] = ctx.PalacePath,
+                ["backend"] = ctx.Backend.ToString("G"),
+                ["protocol"] = PalaceProtocol,
+                ["aaak_dialect"] = AaakSpec
+            };
         }
         catch
         {
@@ -117,7 +133,7 @@ public static class McpTools
         {
             using var s = ctx.OpenPalace();
             var (wings, _) = GetWingsAndRooms(s.Collection);
-            return JsonNode.Parse(JsonSerializer.Serialize(new { wings }))!;
+            return new JsonObject { ["wings"] = DictToJson(wings) };
         }
         catch
         {
@@ -135,7 +151,7 @@ public static class McpTools
             var rooms = rows
                 .GroupBy(r => r.Metadata?.GetValueOrDefault("room") as string ?? "general")
                 .ToDictionary(g => g.Key, g => g.Count());
-            return JsonNode.Parse(JsonSerializer.Serialize(new { wing, rooms }))!;
+            return new JsonObject { ["wing"] = wing, ["rooms"] = DictToJson(rooms) };
         }
         catch
         {
@@ -158,7 +174,7 @@ public static class McpTools
                 tree[w][r] = tree[w].GetValueOrDefault(r) + 1;
             }
 
-            return JsonNode.Parse(JsonSerializer.Serialize(new { taxonomy = tree }))!;
+            return new JsonObject { ["taxonomy"] = TaxonomyToJson(tree) };
         }
         catch
         {
@@ -178,14 +194,13 @@ public static class McpTools
         string? wing = null, string? room = null, CancellationToken ct = default)
     {
         if (limit <= 0)
-            return JsonNode.Parse(JsonSerializer.Serialize(new { query, wing, room, results = Array.Empty<object>() },
-                CamelCase))!;
+            return new JsonObject { ["query"] = query, ["wing"] = wing, ["room"] = room, ["results"] = new JsonArray() };;
         try
         {
             var response = await Searcher.SearchMemoriesAsync(
                 query, ctx.PalacePath, ctx.Embedder, wing, room, limit,
                 ctx.CollectionName, ctx.Backend, ct);
-            return JsonNode.Parse(JsonSerializer.Serialize(response, CamelCase))!;
+            return JsonSerializer.SerializeToNode(response, MempalaceJsonContext.Default.SearchResponse)!;
         }
         catch (SearchError ex)
         {
@@ -200,11 +215,10 @@ public static class McpTools
         {
             using var s = ctx.OpenPalace();
             var results = await s.Collection.SearchAsync(content, ctx.Embedder, ct: ct);
-            var dupes = results
-                .Where(r => r.Similarity >= threshold)
-                .Select(r => (object)new { id = r.Id, similarity = Math.Round(r.Similarity, 3) })
-                .ToList();
-            return JsonNode.Parse(JsonSerializer.Serialize(new { is_duplicate = dupes.Count > 0, matches = dupes }))!;
+            var matchesArr = new JsonArray();
+            foreach (var r in results.Where(r => r.Similarity >= threshold))
+                matchesArr.Add((JsonNode)new JsonObject { ["id"] = r.Id, ["similarity"] = Math.Round(r.Similarity, 3) });
+            return new JsonObject { ["is_duplicate"] = matchesArr.Count > 0, ["matches"] = matchesArr };;
         }
         catch
         {
@@ -233,7 +247,10 @@ public static class McpTools
         {
             using var s = ctx.OpenPalace();
             var tunnels = PalaceGraph.FindTunnels(s.Collection, wingA, wingB);
-            return JsonNode.Parse(JsonSerializer.Serialize(new { tunnels }))!;
+            return new JsonObject
+            {
+                ["tunnels"] = JsonSerializer.SerializeToNode(tunnels.ToList(), MempalaceJsonContext.Default.ListTunnelResult)
+            };;
         }
         catch
         {
@@ -241,6 +258,8 @@ public static class McpTools
         }
     }
 
+    [UnconditionalSuppressMessage("Trimming", "IL2026")]
+    [UnconditionalSuppressMessage("AOT", "IL3050")]
     public static JsonNode GraphStats(McpToolContext ctx)
     {
         try
@@ -262,19 +281,18 @@ public static class McpTools
         try
         {
             var memories = GeneralExtractor.ExtractMemories(text, minConfidence);
-            return JsonNode.Parse(JsonSerializer.Serialize(new
-            {
-                total = memories.Count,
-                by_type = memories
-                    .GroupBy(m => m.MemoryType.ToString("G").ToLowerInvariant())
-                    .ToDictionary(g => g.Key, g => g.Count()),
-                memories = memories.Select(m => new
+            var byType = new JsonObject();
+            foreach (var g in memories.GroupBy(m => m.MemoryType.ToString("G").ToLowerInvariant()))
+                byType[g.Key] = g.Count();
+            var memoriesArr = new JsonArray();
+            foreach (var m in memories)
+                memoriesArr.Add((JsonNode)new JsonObject
                 {
-                    memory_type = m.MemoryType.ToString("G").ToLowerInvariant(),
-                    chunk_index = m.ChunkIndex,
-                    content = m.Content
-                })
-            }))!;
+                    ["memoryType"] = m.MemoryType.ToString("G").ToLowerInvariant(),
+                    ["chunkIndex"] = m.ChunkIndex,
+                    ["content"] = m.Content
+                });
+            return new JsonObject { ["total"] = memories.Count, ["byType"] = byType, ["memories"] = memoriesArr };;
         }
         catch (Exception ex)
         {

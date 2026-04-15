@@ -19,21 +19,24 @@ internal static class OnnxNativeResolver
     internal static void EnsureRegistered()
     {
         if (Interlocked.Exchange(ref _registered, 1) != 0) return;
-        NativeLibrary.SetDllImportResolver(
-            typeof(OrtEnv).Assembly,
-            static (name, assembly, path) =>
-            {
-                if (!name.Equals("onnxruntime.dll", StringComparison.OrdinalIgnoreCase))
+        try
+        {
+            NativeLibrary.SetDllImportResolver(
+                typeof(OrtEnv).Assembly,
+                static (name, _, path) =>
+                {
+                    if (!name.Equals("onnxruntime.dll", StringComparison.OrdinalIgnoreCase))
+                        return IntPtr.Zero;
+                    var candidate = Path.Combine(AppContext.BaseDirectory, "libonnxruntime.dylib");
+                    if (NativeLibrary.TryLoad(candidate, out var h)) return h;
+                    if (NativeLibrary.TryLoad("libonnxruntime.dylib", out h)) return h;
                     return IntPtr.Zero;
-                // assembly.Location is empty in AOT/single-file — use AppContext.BaseDirectory
-                var dir = string.IsNullOrEmpty(assembly.Location)
-                    ? AppContext.BaseDirectory
-                    : Path.GetDirectoryName(assembly.Location) ?? AppContext.BaseDirectory;
-                var candidate = Path.Combine(dir, "libonnxruntime.dylib");
-                if (NativeLibrary.TryLoad(candidate, out var h)) return h;
-                if (NativeLibrary.TryLoad("libonnxruntime.dylib", assembly, path, out h)) return h;
-                return IntPtr.Zero;
-            });
+                });
+        }
+        catch (InvalidOperationException)
+        {
+            // Resolver already registered by another component (ORT's own AOT initializer)
+        }
     }
 }
 

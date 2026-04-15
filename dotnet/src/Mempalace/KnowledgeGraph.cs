@@ -104,6 +104,8 @@ public sealed class KnowledgeGraph : IDisposable
     // -------------------------------------------------------------------------
 
     /// <summary>Add or update an entity. Returns the entity ID.</summary>
+    [UnconditionalSuppressMessage("Trimming", "IL2026")]
+    [UnconditionalSuppressMessage("AOT", "IL3050")]
     public string AddEntity(string name, string type = "unknown",
         Dictionary<string, object?>? properties = null)
     {

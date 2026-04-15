@@ -228,8 +228,7 @@ public static class HooksCli
 
     private static void Output(TextWriter writer, JsonObject data)
     {
-        writer.WriteLine(JsonSerializer.Serialize(data,
-            Json.Indented));
+        writer.WriteLine(data.ToJsonString(Json.Indented));
     }
 
     private static string SanitizeSessionId(string id)
