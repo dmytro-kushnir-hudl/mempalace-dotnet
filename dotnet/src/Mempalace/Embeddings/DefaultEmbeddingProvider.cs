@@ -25,8 +25,10 @@ internal static class OnnxNativeResolver
             {
                 if (!name.Equals("onnxruntime.dll", StringComparison.OrdinalIgnoreCase))
                     return IntPtr.Zero;
-                // Try libonnxruntime.dylib next to the assembly, then default search
-                var dir = Path.GetDirectoryName(assembly.Location) ?? ".";
+                // assembly.Location is empty in AOT/single-file — use AppContext.BaseDirectory
+                var dir = string.IsNullOrEmpty(assembly.Location)
+                    ? AppContext.BaseDirectory
+                    : Path.GetDirectoryName(assembly.Location) ?? AppContext.BaseDirectory;
                 var candidate = Path.Combine(dir, "libonnxruntime.dylib");
                 if (NativeLibrary.TryLoad(candidate, out var h)) return h;
                 if (NativeLibrary.TryLoad("libonnxruntime.dylib", assembly, path, out h)) return h;
