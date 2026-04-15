@@ -21,7 +21,7 @@
         <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.4.1"/>
         <PackageReference Include="YamlDotNet" Version="17.0.1"/>
         <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.5"/>
-        <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.24.1"/>
+        <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.24.4"/>
         <PackageReference Include="Microsoft.ML.Tokenizers" Version="0.22.0"/>
         <PackageReference Include="System.Numerics.Tensors" Version="9.0.4"/>
     </ItemGroup>

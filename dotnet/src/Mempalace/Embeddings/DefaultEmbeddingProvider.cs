@@ -1,10 +1,11 @@
 using System.Buffers;
-using System.Runtime.CompilerServices;
+using System.Formats.Tar;
+using System.IO.Compression;
+using System.Numerics.Tensors;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using Microsoft.Extensions.AI;
 using Microsoft.ML.OnnxRuntime;
-using Microsoft.ML.OnnxRuntime.Tensors;
 using Microsoft.ML.Tokenizers;
 
 namespace Mempalace.Embeddings;
@@ -34,6 +35,9 @@ internal static class OnnxNativeResolver
     }
 }
 
+/// <summary>Requested / active ONNX execution provider.</summary>
+public enum ExecutionProvider { Auto, Cpu, CoreML }
+
 /// <summary>
 ///     ONNX-based embedding provider that exactly matches the Python ChromaDB default:
 ///     <c>all-MiniLM-L6-v2</c> with mean pooling and L2 normalisation (384 dims).
@@ -55,8 +59,7 @@ public sealed class DefaultEmbeddingProvider
     public const int MaxTokens = 256;
     public const int EmbeddingDim = 384;
 
-    // INT8 quantized model — dynamic quantization, ~3–4× faster on ARM64 UDOT
-    // ARM64-optimized INT8 — uses UDOT instructions on Apple Silicon
+    // INT8 quantized model — ARM64-optimized, uses UDOT instructions on Apple Silicon
     public const string Int8ModelUrl = "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/onnx/model_qint8_arm64.onnx";
 
     private static readonly string ModelCacheDir = Path.Combine(
@@ -69,24 +72,38 @@ public sealed class DefaultEmbeddingProvider
 
     private static readonly HttpClient Http = new();
 
+    // Static RunOptions and input names — avoids per-call allocation
+    private static readonly RunOptions s_runOptions = new();
+    private static readonly string[] s_inputNames = ["input_ids", "attention_mask", "token_type_ids"];
+
     private readonly InferenceSession _session;
     private readonly BertTokenizer _tokenizer;
+    private readonly ExecutionProvider _activeProvider;
     private bool _disposed;
 
     public static int Dimensions => EmbeddingDim;
+    public ExecutionProvider ActiveProvider => _activeProvider;
 
-    private DefaultEmbeddingProvider(InferenceSession session, BertTokenizer tokenizer)
+    private DefaultEmbeddingProvider(InferenceSession session, BertTokenizer tokenizer, ExecutionProvider activeProvider)
     {
         _session = session;
         _tokenizer = tokenizer;
+        _activeProvider = activeProvider;
     }
 
     /// <summary>
     ///     Creates and initialises the provider, downloading the ONNX model if needed.
     /// </summary>
     /// <param name="useInt8">Use INT8 quantized model (~23 MB, ~3–4× faster inference).</param>
+    /// <param name="provider">
+    ///     <see cref="ExecutionProvider.Auto"/> (default) tries CoreML on macOS, falls back to CPU.
+    ///     <see cref="ExecutionProvider.CoreML"/> routes to Apple ANE/GPU on macOS Apple Silicon.
+    ///     <see cref="ExecutionProvider.Cpu"/> uses ONNX CPU provider with all graph optimizations.
+    /// </param>
     public static async Task<DefaultEmbeddingProvider> CreateAsync(
-        bool useInt8 = false, CancellationToken ct = default)
+        bool useInt8 = false,
+        ExecutionProvider provider = ExecutionProvider.Auto,
+        CancellationToken ct = default)
     {
         Console.WriteLine("[embedder] ensuring model cache...");
         await EnsureModelAsync(ct).ConfigureAwait(false);
@@ -110,14 +127,11 @@ public sealed class DefaultEmbeddingProvider
         var label = useInt8 ? "~23 MB INT8 quantized" : "~90 MB float32";
         Console.WriteLine($"[embedder] loading ONNX session ({label})...");
         OnnxNativeResolver.EnsureRegistered();
-        var opts = new SessionOptions();
-        opts.LogSeverityLevel = OrtLoggingLevel.ORT_LOGGING_LEVEL_ERROR;
-        opts.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
 
-        var session = new InferenceSession(modelPath, opts);
-        Console.WriteLine("[embedder] ready.");
+        var (session, activeProvider) = CreateSession(modelPath, provider);
+        Console.WriteLine($"[embedder] ready ({activeProvider}).");
 
-        return new DefaultEmbeddingProvider(session, tokenizer);
+        return new DefaultEmbeddingProvider(session, tokenizer, activeProvider);
     }
 
     // -------------------------------------------------------------------------
@@ -146,7 +160,12 @@ public sealed class DefaultEmbeddingProvider
             var batch = new ReadOnlyMemory<char>[end - i];
             for (int j = 0; j < batch.Length; j++) batch[j] = texts[i + j];
 
-            var batchFloats = EmbedBatch(batch);
+            // ANE: one ONNX call per item with fixed [1, MaxTokens] shape.
+            // CPU: full batch with dynamic seq len to avoid wasted compute on short chunks.
+            var batchFloats = _activeProvider == ExecutionProvider.CoreML
+                ? EmbedBatchCoreML(batch)
+                : EmbedBatchCpu(batch);
+
             foreach (var vec in batchFloats)
                 embeddings.Add(new Embedding<float>(vec));
         }
@@ -159,148 +178,264 @@ public sealed class DefaultEmbeddingProvider
         => serviceType.IsInstanceOfType(this) ? this : null;
 
     // -------------------------------------------------------------------------
-    // Inference pipeline (mirrors Python _forward)
+    // CPU path — full batch, dynamic seq len to skip padding on short chunks
     // -------------------------------------------------------------------------
 
-    private float[][] EmbedBatch(ReadOnlyMemory<char>[] texts)
+    private float[][] EmbedBatchCpu(ReadOnlyMemory<char>[] texts)
     {
-        int batch   = texts.Length;
-        int flatLen = batch * MaxTokens;
+        var batchCount = texts.Length;
 
-        var inputIds      = ArrayPool<long>.Shared.Rent(flatLen);
-        var attentionMask = ArrayPool<long>.Shared.Rent(flatLen);
-        var tokenTypeIds  = ArrayPool<long>.Shared.Rent(flatLen);
-
-        // token_type_ids is always all-zero — one vectorised AVX sweep before the loop
-        Unsafe.InitBlockUnaligned(
-            ref Unsafe.As<long, byte>(ref tokenTypeIds[0]),
-            0,
-            (uint)(flatLen * sizeof(long)));
-
-        for (int b = 0; b < batch; b++)
+        // Tokenize all texts first — needed to compute per-batch maxSeqLen
+        var allIds = new IReadOnlyList<int>[batchCount];
+        var maxSeqLen = 1;
+        for (var b = 0; b < batchCount; b++)
         {
-            // BertTokenizer adds [CLS]=101 and [SEP]=102 automatically.
-            // maxTokenCount caps the result (including special tokens) to MaxTokens.
-            var chars = texts[b].Span;
+            allIds[b] = TokenizeText(texts[b].Span);
+            maxSeqLen = Math.Max(maxSeqLen, allIds[b].Count);
+        }
 
-            // Strip invalid Unicode — scan first, compact into pooled buf only if dirty
-            bool dirty = false;
-            foreach (var c in chars)
-                if (char.IsSurrogate(c) || c == '\uFFFE' || c == '\uFFFF') { dirty = true; break; }
+        var totalTokens = batchCount * maxSeqLen;
+        var inputIds = ArrayPool<long>.Shared.Rent(totalTokens);
+        var attnMask = ArrayPool<long>.Shared.Rent(totalTokens);
+        var typeIds  = ArrayPool<long>.Shared.Rent(totalTokens);
 
-            ReadOnlySpan<char> tokenInput;
-            char[]? cleanBuf = null;
-            if (dirty)
-            {
-                cleanBuf = System.Buffers.ArrayPool<char>.Shared.Rent(chars.Length);
-                int w = 0;
-                foreach (var c in chars)
-                    if (!char.IsSurrogate(c) && c != '\uFFFE' && c != '\uFFFF') cleanBuf[w++] = c;
-                tokenInput = cleanBuf.AsSpan(0, w);
-            }
-            else
-            {
-                tokenInput = chars;
-            }
+        try
+        {
+            inputIds.AsSpan(0, totalTokens).Clear();
+            attnMask.AsSpan(0, totalTokens).Clear();
+            typeIds.AsSpan(0, totalTokens).Clear();
 
-            // Normalization — skip alloc for pure-ASCII (always NFC)
-            string? normalized = null;
-            bool hasNonAscii = false;
-            foreach (var c in tokenInput)
-                if (c > 127) { hasNonAscii = true; break; }
-            if (hasNonAscii)
+            for (var b = 0; b < batchCount; b++)
             {
-                var s = new string(tokenInput);
-                if (!s.IsNormalized())
+                var ids = allIds[b];
+                var rowBase = b * maxSeqLen;
+                var len = Math.Min(ids.Count, maxSeqLen);
+                for (var t = 0; t < len; t++)
                 {
-                    normalized = s.Normalize();
-                    tokenInput = normalized.AsSpan();
+                    inputIds[rowBase + t] = ids[t];
+                    attnMask[rowBase + t] = 1L;
                 }
             }
 
-            var ids = _tokenizer.EncodeToIds(tokenInput, MaxTokens, out _, out _);
-            if (cleanBuf is not null) System.Buffers.ArrayPool<char>.Shared.Return(cleanBuf);
-            int len = ids.Count;
+            var shape = new long[] { batchCount, maxSeqLen };
+            var info = OrtMemoryInfo.DefaultInstance;
 
-            int baseIdx  = b * MaxTokens;
-            int padStart = baseIdx + len;
-            int padLen   = MaxTokens - len;
+            using var inputIdsVal = OrtValue.CreateTensorValueFromMemory(info, inputIds.AsMemory(0, totalTokens), shape);
+            using var attnMaskVal = OrtValue.CreateTensorValueFromMemory(info, attnMask.AsMemory(0, totalTokens), shape);
+            using var typeIdsVal  = OrtValue.CreateTensorValueFromMemory(info, typeIds.AsMemory(0, totalTokens), shape);
+            OrtValue[] inputValues = [inputIdsVal, attnMaskVal, typeIdsVal];
 
-            for (int t = 0; t < len; t++)
-                inputIds[baseIdx + t] = ids[t];
-            // Zero padding slots — rented array is dirty; guard padLen>0 to avoid
-            // out-of-bounds ref when len==MaxTokens (text fills all slots exactly)
-            if (padLen > 0)
+            using var outputs = _session.Run(s_runOptions, s_inputNames, inputValues, _session.OutputNames);
+            var hidden = outputs[0].GetTensorDataAsSpan<float>();
+
+            var result = new float[batchCount][];
+            for (var b = 0; b < batchCount; b++)
+                result[b] = PoolEmbedding(hidden, attnMask, b, maxSeqLen);
+
+            return result;
+        }
+        finally
+        {
+            // Return AFTER the pooling loop above has finished reading attnMask
+            ArrayPool<long>.Shared.Return(inputIds);
+            ArrayPool<long>.Shared.Return(attnMask);
+            ArrayPool<long>.Shared.Return(typeIds);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // CoreML path — static shape [1, MaxTokens] per item, delegates to ANE/GPU
+    // -------------------------------------------------------------------------
+
+    private float[][] EmbedBatchCoreML(ReadOnlyMemory<char>[] texts)
+    {
+        var batchCount = texts.Length;
+        var result = new float[batchCount][];
+
+        var inputIds = ArrayPool<long>.Shared.Rent(MaxTokens);
+        var attnMask = ArrayPool<long>.Shared.Rent(MaxTokens);
+        var typeIds  = ArrayPool<long>.Shared.Rent(MaxTokens);
+        typeIds.AsSpan(0, MaxTokens).Clear(); // token_type_ids is always 0
+
+        try
+        {
+            var shape = new long[] { 1L, MaxTokens };
+            var info = OrtMemoryInfo.DefaultInstance;
+
+            for (var b = 0; b < batchCount; b++)
             {
-                Unsafe.InitBlockUnaligned(
-                    ref Unsafe.As<long, byte>(ref inputIds[padStart]),
-                    0,
-                    (uint)(padLen * sizeof(long)));
-            }
+                var ids = TokenizeText(texts[b].Span);
 
-            for (int t = 0; t < len; t++)
-                attentionMask[baseIdx + t] = 1L;
-            if (padLen > 0)
-            {
-                Unsafe.InitBlockUnaligned(
-                    ref Unsafe.As<long, byte>(ref attentionMask[padStart]),
-                    0,
-                    (uint)(padLen * sizeof(long)));
+                inputIds.AsSpan(0, MaxTokens).Clear();
+                attnMask.AsSpan(0, MaxTokens).Clear();
+                var len = Math.Min(ids.Count, MaxTokens);
+                for (var t = 0; t < len; t++)
+                {
+                    inputIds[t] = ids[t];
+                    attnMask[t] = 1L;
+                }
+
+                using var inputIdsVal = OrtValue.CreateTensorValueFromMemory(info, inputIds.AsMemory(0, MaxTokens), shape);
+                using var attnMaskVal = OrtValue.CreateTensorValueFromMemory(info, attnMask.AsMemory(0, MaxTokens), shape);
+                using var typeIdsVal  = OrtValue.CreateTensorValueFromMemory(info, typeIds.AsMemory(0, MaxTokens), shape);
+                OrtValue[] inputValues = [inputIdsVal, attnMaskVal, typeIdsVal];
+
+                using var outputs = _session.Run(s_runOptions, s_inputNames, inputValues, _session.OutputNames);
+                result[b] = PoolEmbedding(outputs[0].GetTensorDataAsSpan<float>(), attnMask, 0, MaxTokens);
             }
         }
-
-        int[] dims = [batch, MaxTokens];
-
-        var inputs = new[]
+        finally
         {
-            NamedOnnxValue.CreateFromTensor("input_ids",
-                new DenseTensor<long>(inputIds.AsMemory(0, flatLen), dims)),
-            NamedOnnxValue.CreateFromTensor("attention_mask",
-                new DenseTensor<long>(attentionMask.AsMemory(0, flatLen), dims)),
-            NamedOnnxValue.CreateFromTensor("token_type_ids",
-                new DenseTensor<long>(tokenTypeIds.AsMemory(0, flatLen), dims)),
-        };
-
-        using var outputs = _session.Run(inputs);
-        ArrayPool<long>.Shared.Return(inputIds);
-        ArrayPool<long>.Shared.Return(attentionMask);
-        ArrayPool<long>.Shared.Return(tokenTypeIds);
-        // last_hidden_state: [batch, MaxTokens, EmbeddingDim]
-        var hidden = outputs[0].AsTensor<float>();
-
-        var result = new float[batch][];
-        for (int b = 0; b < batch; b++)
-        {
-            var emb = new float[EmbeddingDim];
-            float maskSum = 0f;
-
-            int baseIdx = b * MaxTokens;
-            for (int t = 0; t < MaxTokens; t++)
-            {
-                float mask = attentionMask[baseIdx + t]; // 0 or 1
-                if (mask == 0f) continue;
-                maskSum += mask;
-                for (int d = 0; d < EmbeddingDim; d++)
-                    emb[d] += hidden[b, t, d] * mask;
-            }
-
-            // Mean pool (clip denominator to avoid div-by-zero)
-            maskSum = MathF.Max(maskSum, 1e-9f);
-            for (int d = 0; d < EmbeddingDim; d++)
-                emb[d] /= maskSum;
-
-            // L2 normalise (PyTorch default eps = 1e-12)
-            float norm = 0f;
-            for (int d = 0; d < EmbeddingDim; d++)
-                norm += emb[d] * emb[d];
-            norm = MathF.Max(MathF.Sqrt(norm), 1e-12f);
-            for (int d = 0; d < EmbeddingDim; d++)
-                emb[d] /= norm;
-
-            result[b] = emb;
+            ArrayPool<long>.Shared.Return(inputIds);
+            ArrayPool<long>.Shared.Return(attnMask);
+            ArrayPool<long>.Shared.Return(typeIds);
         }
 
         return result;
+    }
+
+    // -------------------------------------------------------------------------
+    // Tokenize one text — strips surrogates + NFC normalises non-ASCII
+    // -------------------------------------------------------------------------
+
+    private IReadOnlyList<int> TokenizeText(ReadOnlySpan<char> chars)
+    {
+        // Strip surrogates and reserved Unicode code points
+        bool dirty = false;
+        foreach (var c in chars)
+            if (char.IsSurrogate(c) || c == '\uFFFE' || c == '\uFFFF') { dirty = true; break; }
+
+        char[]? rentedClean = null;
+        int cleanLen = 0;
+        if (dirty)
+        {
+            rentedClean = ArrayPool<char>.Shared.Rent(chars.Length);
+            foreach (var c in chars)
+                if (!char.IsSurrogate(c) && c != '\uFFFE' && c != '\uFFFF') rentedClean[cleanLen++] = c;
+        }
+
+        ReadOnlySpan<char> input = dirty ? rentedClean!.AsSpan(0, cleanLen) : chars;
+
+        // NFC normalise non-ASCII — lazy: skip pure-ASCII strings (always NFC)
+        string? normalized = null;
+        bool hasNonAscii = false;
+        foreach (var c in input)
+            if (c > 127) { hasNonAscii = true; break; }
+        if (hasNonAscii)
+        {
+            var s = new string(input);
+            if (!s.IsNormalized())
+                normalized = s.Normalize();
+        }
+
+        var tokenInput = normalized is not null ? normalized.AsSpan() : input;
+        var ids = _tokenizer.EncodeToIds(tokenInput, MaxTokens, normalizedText: out _, charsConsumed: out _);
+
+        if (rentedClean is not null) ArrayPool<char>.Shared.Return(rentedClean);
+        return ids;
+    }
+
+    // -------------------------------------------------------------------------
+    // SIMD mean pooling + L2 normalisation via TensorPrimitives
+    // -------------------------------------------------------------------------
+
+    private static float[] PoolEmbedding(ReadOnlySpan<float> hidden, long[] attnMask, int batchIdx, int seqLen)
+    {
+        var emb = new float[EmbeddingDim];
+        var rowOffset = batchIdx * seqLen;
+        float maskSum = 0f;
+
+        for (var t = 0; t < seqLen; t++)
+        {
+            if (attnMask[rowOffset + t] == 0) continue;
+            maskSum++;
+            TensorPrimitives.Add(
+                (ReadOnlySpan<float>)emb,
+                hidden.Slice((rowOffset + t) * EmbeddingDim, EmbeddingDim),
+                emb);
+        }
+
+        // Mean pool then L2 normalise
+        maskSum = MathF.Max(maskSum, 1e-9f);
+        TensorPrimitives.Divide((ReadOnlySpan<float>)emb, maskSum, emb);
+
+        var norm = TensorPrimitives.Norm((ReadOnlySpan<float>)emb);
+        norm = MathF.Max(norm, 1e-12f);
+        TensorPrimitives.Divide((ReadOnlySpan<float>)emb, norm, emb);
+
+        return emb;
+    }
+
+    // -------------------------------------------------------------------------
+    // Session factory — mirrors rag-pg OnnxEmbedder.CreateSession
+    // -------------------------------------------------------------------------
+
+    private static (InferenceSession Session, ExecutionProvider ActiveProvider) CreateSession(
+        string modelPath, ExecutionProvider provider)
+    {
+        switch (provider)
+        {
+            case ExecutionProvider.Cpu:
+                return (new InferenceSession(modelPath, CreateCpuSessionOptions()), ExecutionProvider.Cpu);
+
+            case ExecutionProvider.CoreML:
+                return (new InferenceSession(modelPath, CreateCoreMlSessionOptions()),
+                    ExecutionProvider.CoreML);
+
+            case ExecutionProvider.Auto:
+                if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                    return (new InferenceSession(modelPath, CreateCpuSessionOptions()), ExecutionProvider.Cpu);
+                try
+                {
+                    return (new InferenceSession(modelPath, CreateCoreMlSessionOptions()),
+                        ExecutionProvider.CoreML);
+                }
+                catch (Exception ex) when (ex is OnnxRuntimeException or NotSupportedException)
+                {
+                    Console.WriteLine($"[embedder] CoreML unavailable, falling back to CPU: {ex.Message}");
+                    return (new InferenceSession(modelPath, CreateCpuSessionOptions()), ExecutionProvider.Cpu);
+                }
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(provider));
+        }
+    }
+
+    private static SessionOptions CreateBaseSessionOptions()
+    {
+        var opts = new SessionOptions();
+        opts.LogSeverityLevel = OrtLoggingLevel.ORT_LOGGING_LEVEL_ERROR;
+        // Level 3: includes layout optimizations and op fusion (critical for BERT)
+        opts.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
+        // BERT layers are linearly dependent — sequential execution is optimal
+        opts.ExecutionMode = ExecutionMode.ORT_SEQUENTIAL;
+        // Pre-allocate contiguous memory blocks for activations
+        opts.EnableMemoryPattern = true;
+        opts.EnableCpuMemArena = true;
+        return opts;
+    }
+
+    private static SessionOptions CreateCpuSessionOptions()
+    {
+        var opts = CreateBaseSessionOptions();
+        opts.IntraOpNumThreads = Environment.ProcessorCount;
+        // Thread spinning keeps threads awake between ops, reducing latency
+        opts.AddSessionConfigEntry("session.intra_op.thread_affinities", "1");
+        return opts;
+    }
+
+    private static SessionOptions CreateCoreMlSessionOptions()
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            throw new NotSupportedException("CoreML requires macOS.");
+        var opts = CreateBaseSessionOptions();
+        // Keep CPU thread pool minimal — ANE/GPU handles computation
+        opts.IntraOpNumThreads = 1;
+        // MLPROGRAM is the modern CoreML backend required to dispatch to Apple Neural Engine
+        opts.AppendExecutionProvider_CoreML(
+            CoreMLFlags.COREML_FLAG_ONLY_ALLOW_STATIC_INPUT_SHAPES |
+            CoreMLFlags.COREML_FLAG_CREATE_MLPROGRAM);
+        return opts;
     }
 
     // -------------------------------------------------------------------------
@@ -343,7 +478,7 @@ public sealed class DefaultEmbeddingProvider
     {
         if (File.Exists(modelPath)) return;
         Directory.CreateDirectory(Path.GetDirectoryName(modelPath)!);
-        Console.WriteLine($"[embedder] downloading INT8 model from HuggingFace (~23 MB)...");
+        Console.WriteLine("[embedder] downloading INT8 model from HuggingFace (~23 MB)...");
         await DownloadFileAsync(Int8ModelUrl, modelPath, ct).ConfigureAwait(false);
         Console.WriteLine("[embedder] INT8 model downloaded.");
     }
@@ -363,9 +498,8 @@ public sealed class DefaultEmbeddingProvider
     private static void ExtractTarGz(string archivePath, string destDir)
     {
         using var fs = File.OpenRead(archivePath);
-        using var gz = new System.IO.Compression.GZipStream(
-            fs, System.IO.Compression.CompressionMode.Decompress);
-        System.Formats.Tar.TarFile.ExtractToDirectory(gz, destDir, overwriteFiles: true);
+        using var gz = new GZipStream(fs, CompressionMode.Decompress);
+        TarFile.ExtractToDirectory(gz, destDir, overwriteFiles: true);
     }
 
     private static bool VerifySha256(string path, string expectedHex)
@@ -375,7 +509,7 @@ public sealed class DefaultEmbeddingProvider
         var hash = sha.ComputeHash(stream);
         return Convert.ToHexString(hash).Equals(expectedHex, StringComparison.OrdinalIgnoreCase);
     }
-    
+
     public void Dispose()
     {
         if (_disposed) return;

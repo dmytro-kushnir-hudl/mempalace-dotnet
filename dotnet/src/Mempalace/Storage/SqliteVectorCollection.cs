@@ -1,3 +1,4 @@
+using System.Numerics.Tensors;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Data.Sqlite;
@@ -21,8 +22,13 @@ public sealed class SqliteVectorCollection : IVectorCollection
 {
     private readonly SqliteConnection _conn;
     private readonly int _embeddingDim;
+    private readonly byte[] _embeddingBuffer; // reused across inserts — no per-call alloc
     private bool _disposed;
     private bool _hasVec0;
+
+    // Pre-baked upsert commands — compiled once, reused across batches
+    private SqliteCommand? _upsertDrawerCmd;
+    private SqliteCommand? _upsertVecCmd;
 
     public SqliteVectorCollection(string dbPath, int embeddingDim = 384)
     {
@@ -34,6 +40,8 @@ public sealed class SqliteVectorCollection : IVectorCollection
             DataSource = dbPath,
             Mode = SqliteOpenMode.ReadWriteCreate
         };
+        _embeddingBuffer = new byte[embeddingDim * sizeof(float)];
+
         _conn = new SqliteConnection(csb.ToString());
         _conn.Open();
 
@@ -61,7 +69,12 @@ public sealed class SqliteVectorCollection : IVectorCollection
         var vecs = await embedder.GenerateAsync(documents, cancellationToken: ct)
             .ConfigureAwait(false);
 
+        // Prepare commands once per SqliteVectorCollection lifetime
+        EnsureUpsertCommands();
+
         using var tx = _conn.BeginTransaction();
+        _upsertDrawerCmd!.Transaction = tx;
+        if (_upsertVecCmd is not null) _upsertVecCmd.Transaction = tx;
 
         for (var i = 0; i < ids.Length; i++)
         {
@@ -72,8 +85,9 @@ public sealed class SqliteVectorCollection : IVectorCollection
             var docBytes = new byte[Encoding.UTF8.GetByteCount(docSpan)];
             Encoding.UTF8.GetBytes(docSpan, docBytes);
             var meta = metadatas?[i];
-            var emb = vecs[i].Vector.ToArray();
-            var embBytes = FloatsToBytes(emb);
+
+            // Reinterpret float span as bytes into the pre-allocated buffer — no allocation
+            MemoryMarshal.Cast<float, byte>(vecs[i].Vector.Span).CopyTo(_embeddingBuffer.AsSpan());
 
             var wing = meta?.GetValueOrDefault("wing") as string ?? "";
             var room = meta?.GetValueOrDefault("room") as string ?? "";
@@ -82,39 +96,75 @@ public sealed class SqliteVectorCollection : IVectorCollection
             var addedBy = meta?.GetValueOrDefault("added_by") as string ?? "";
             var filedAt = meta?.GetValueOrDefault("filed_at") as string ?? "";
             var sourceMtime = meta?.GetValueOrDefault("source_mtime") is double sm ? sm : 0.0;
-            var metaJson = meta is not null
-                ? JsonSerializer.Serialize(meta)
-                : null;
+            var metaJson = meta is not null ? JsonSerializer.Serialize(meta) : null;
 
-            ExecuteParams("""
-                          INSERT INTO drawers
-                              (id, wing, room, source_file, chunk_index, added_by, filed_at,
-                               source_mtime, document, metadata_json, embedding)
-                          VALUES
-                              ($id,$wing,$room,$sf,$ci,$ab,$fa,$sm,$doc,$mj,$emb)
-                          ON CONFLICT(id) DO UPDATE SET
-                              wing=excluded.wing, room=excluded.room,
-                              source_file=excluded.source_file, chunk_index=excluded.chunk_index,
-                              added_by=excluded.added_by, filed_at=excluded.filed_at,
-                              source_mtime=excluded.source_mtime, document=excluded.document,
-                              metadata_json=excluded.metadata_json, embedding=excluded.embedding;
-                          """,
-                ("$id", id), ("$wing", wing), ("$room", room),
-                ("$sf", sourceFile), ("$ci", chunkIndex), ("$ab", addedBy),
-                ("$fa", filedAt), ("$sm", sourceMtime),
-                ("$doc", docBytes), ("$mj", (object?)metaJson ?? DBNull.Value),
-                ("$emb", embBytes));
+            _upsertDrawerCmd.Parameters["$id"].Value = id;
+            _upsertDrawerCmd.Parameters["$wing"].Value = wing;
+            _upsertDrawerCmd.Parameters["$room"].Value = room;
+            _upsertDrawerCmd.Parameters["$sf"].Value = sourceFile;
+            _upsertDrawerCmd.Parameters["$ci"].Value = chunkIndex;
+            _upsertDrawerCmd.Parameters["$ab"].Value = addedBy;
+            _upsertDrawerCmd.Parameters["$fa"].Value = filedAt;
+            _upsertDrawerCmd.Parameters["$sm"].Value = sourceMtime;
+            _upsertDrawerCmd.Parameters["$doc"].Value = docBytes;
+            _upsertDrawerCmd.Parameters["$mj"].Value = (object?)metaJson ?? DBNull.Value;
+            _upsertDrawerCmd.Parameters["$emb"].Value = _embeddingBuffer;
+            _upsertDrawerCmd.ExecuteNonQuery();
 
-            if (_hasVec0)
-                ExecuteParams("""
-                              INSERT INTO drawers_vec(id, embedding)
-                              VALUES ($id, $emb)
-                              ON CONFLICT(id) DO UPDATE SET embedding=excluded.embedding;
-                              """,
-                    ("$id", id), ("$emb", embBytes));
+            if (_upsertVecCmd is not null)
+            {
+                _upsertVecCmd.Parameters["$id"].Value = id;
+                _upsertVecCmd.Parameters["$emb"].Value = _embeddingBuffer;
+                _upsertVecCmd.ExecuteNonQuery();
+            }
         }
 
         tx.Commit();
+    }
+
+    // Pre-bake upsert commands once — Prepare() compiles the SQL, parameters reused per batch
+    private void EnsureUpsertCommands()
+    {
+        if (_upsertDrawerCmd is not null) return;
+
+        _upsertDrawerCmd = _conn.CreateCommand();
+        _upsertDrawerCmd.CommandText = """
+            INSERT INTO drawers
+                (id, wing, room, source_file, chunk_index, added_by, filed_at,
+                 source_mtime, document, metadata_json, embedding)
+            VALUES
+                ($id,$wing,$room,$sf,$ci,$ab,$fa,$sm,$doc,$mj,$emb)
+            ON CONFLICT(id) DO UPDATE SET
+                wing=excluded.wing, room=excluded.room,
+                source_file=excluded.source_file, chunk_index=excluded.chunk_index,
+                added_by=excluded.added_by, filed_at=excluded.filed_at,
+                source_mtime=excluded.source_mtime, document=excluded.document,
+                metadata_json=excluded.metadata_json, embedding=excluded.embedding;
+            """;
+        _upsertDrawerCmd.Parameters.Add("$id",   SqliteType.Text);
+        _upsertDrawerCmd.Parameters.Add("$wing", SqliteType.Text);
+        _upsertDrawerCmd.Parameters.Add("$room", SqliteType.Text);
+        _upsertDrawerCmd.Parameters.Add("$sf",   SqliteType.Text);
+        _upsertDrawerCmd.Parameters.Add("$ci",   SqliteType.Integer);
+        _upsertDrawerCmd.Parameters.Add("$ab",   SqliteType.Text);
+        _upsertDrawerCmd.Parameters.Add("$fa",   SqliteType.Text);
+        _upsertDrawerCmd.Parameters.Add("$sm",   SqliteType.Real);
+        _upsertDrawerCmd.Parameters.Add("$doc",  SqliteType.Blob);
+        _upsertDrawerCmd.Parameters.Add("$mj",   SqliteType.Text);
+        _upsertDrawerCmd.Parameters.Add("$emb",  SqliteType.Blob);
+        _upsertDrawerCmd.Prepare();
+
+        if (_hasVec0)
+        {
+            _upsertVecCmd = _conn.CreateCommand();
+            _upsertVecCmd.CommandText = """
+                INSERT INTO drawers_vec(id, embedding) VALUES ($id, $emb)
+                ON CONFLICT(id) DO UPDATE SET embedding=excluded.embedding;
+                """;
+            _upsertVecCmd.Parameters.Add("$id",  SqliteType.Text);
+            _upsertVecCmd.Parameters.Add("$emb", SqliteType.Blob);
+            _upsertVecCmd.Prepare();
+        }
     }
 
     public void Delete(string[] ids)
@@ -248,6 +298,8 @@ public sealed class SqliteVectorCollection : IVectorCollection
     {
         if (_disposed) return;
         _disposed = true;
+        _upsertDrawerCmd?.Dispose();
+        _upsertVecCmd?.Dispose();
         _conn.Dispose();
     }
 
@@ -494,15 +546,10 @@ public sealed class SqliteVectorCollection : IVectorCollection
     private static float CosineSimilarity(float[] a, float[] b)
     {
         if (a.Length != b.Length) return 0f;
-        float dot = 0, normA = 0, normB = 0;
-        for (var i = 0; i < a.Length; i++)
-        {
-            dot += a[i] * b[i];
-            normA += a[i] * a[i];
-            normB += b[i] * b[i];
-        }
-
-        var denom = MathF.Sqrt(normA) * MathF.Sqrt(normB);
+        var dot   = TensorPrimitives.Dot<float>(a.AsSpan(), b.AsSpan());
+        var normA = TensorPrimitives.Norm<float>(a.AsSpan());
+        var normB = TensorPrimitives.Norm<float>(b.AsSpan());
+        var denom = normA * normB;
         return denom < 1e-9f ? 0f : dot / denom;
     }
 

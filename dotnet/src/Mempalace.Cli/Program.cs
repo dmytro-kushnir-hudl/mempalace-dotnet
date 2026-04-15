@@ -7,6 +7,7 @@ using Mempalace;
 // ---------------------------------------------------------------------------
 
 var _useInt8 = false;
+var _provider = ExecutionProvider.Auto;
 DefaultEmbeddingProvider? _embedder = null;
 
 async Task<DefaultEmbeddingProvider> GetEmbedder()
@@ -14,7 +15,7 @@ async Task<DefaultEmbeddingProvider> GetEmbedder()
     if (_embedder is null)
     {
         Console.Error.WriteLine("Loading embedding model...");
-        _embedder = await DefaultEmbeddingProvider.CreateAsync(useInt8: _useInt8);
+        _embedder = await DefaultEmbeddingProvider.CreateAsync(useInt8: _useInt8, provider: _provider);
     }
 
     return _embedder;
@@ -38,9 +39,14 @@ backendOpt.DefaultValueFactory = _ => VectorBackend.Sqlite;
 var int8Opt = new Option<bool>("--int8")
     { Description = "Use INT8 quantized model (~23 MB, ~3-4x faster inference)", Recursive = true };
 
+var providerOpt = new Option<ExecutionProvider>("--provider")
+    { Description = "ONNX execution provider: Auto | Cpu | CoreML (default: Auto)", Recursive = true };
+providerOpt.DefaultValueFactory = _ => ExecutionProvider.Auto;
+
 rootCmd.Add(palaceOpt);
 rootCmd.Add(backendOpt);
 rootCmd.Add(int8Opt);
+rootCmd.Add(providerOpt);
 
 // ---------------------------------------------------------------------------
 // mine
@@ -370,6 +376,7 @@ rootCmd.Add(instrCmd);
 
 var parseResult = rootCmd.Parse(args);
 _useInt8 = parseResult.GetValue(int8Opt);
+_provider = parseResult.GetValue(providerOpt);
 var exitCode = await parseResult.InvokeAsync();
 _embedder?.Dispose();
 return exitCode;
