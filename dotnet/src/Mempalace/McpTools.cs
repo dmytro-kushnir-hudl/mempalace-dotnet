@@ -258,8 +258,6 @@ public static class McpTools
         }
     }
 
-    [UnconditionalSuppressMessage("Trimming", "IL2026")]
-    [UnconditionalSuppressMessage("AOT", "IL3050")]
     public static JsonNode GraphStats(McpToolContext ctx)
     {
         try
@@ -292,7 +290,12 @@ public static class McpTools
                     ["chunkIndex"] = m.ChunkIndex,
                     ["content"] = m.Content
                 });
-            return new JsonObject { ["total"] = memories.Count, ["byType"] = byType, ["memories"] = memoriesArr };;
+            return new JsonObject
+            {
+                ["total"] = memories.Count,
+                ["by_type"] = byType, 
+                ["memories"] = memoriesArr
+            };;
         }
         catch (Exception ex)
         {

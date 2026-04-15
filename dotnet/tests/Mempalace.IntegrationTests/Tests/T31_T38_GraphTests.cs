@@ -48,9 +48,9 @@ public sealed class T31_T38_GraphTests(EmbedderFixture embedder) : IAsyncLifetim
 
         var tunnels = s.Result(2)["tunnels"]!.AsArray();
         Assert.NotEmpty(tunnels);
-        var authTunnel = tunnels.FirstOrDefault(t => t!["Room"]?.GetValue<string>() == "auth");
+        var authTunnel = tunnels.FirstOrDefault(t => t!["room"]?.GetValue<string>() == "auth");
         Assert.NotNull(authTunnel);
-        var wings = authTunnel!["Wings"]!.AsArray().Select(w => w!.GetValue<string>()).ToList();
+        var wings = authTunnel!["wings"]!.AsArray().Select(w => w!.GetValue<string>()).ToList();
         Assert.Contains("backend", wings);
         Assert.Contains("frontend", wings);
     }
@@ -65,7 +65,7 @@ public sealed class T31_T38_GraphTests(EmbedderFixture embedder) : IAsyncLifetim
         var tunnels = s.Result(2)["tunnels"]!.AsArray();
         foreach (var t in tunnels)
         {
-            var wings = t!["Wings"]!.AsArray().Select(w => w!.GetValue<string>()).ToList();
+            var wings = t!["wings"]!.AsArray().Select(w => w!.GetValue<string>()).ToList();
             Assert.Contains("backend", wings);
         }
     }
@@ -80,7 +80,7 @@ public sealed class T31_T38_GraphTests(EmbedderFixture embedder) : IAsyncLifetim
 
         var tunnels = s.Result(2)["tunnels"]!.AsArray();
         Assert.Single(tunnels);
-        Assert.Equal("auth", tunnels[0]!["Room"]!.GetValue<string>());
+        Assert.Equal("auth", tunnels[0]!["room"]!.GetValue<string>());
     }
 
     [Fact]

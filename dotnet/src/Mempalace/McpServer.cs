@@ -321,7 +321,7 @@ public static class McpServer
 
     // ── Schema helpers ────────────────────────────────────────────────────────
 
-    private static JsonNode Tool(string name, string desc, JsonNode props)
+    private static JsonObject Tool(string name, string desc, JsonNode props)
     {
         return new JsonObject
         {
@@ -331,13 +331,13 @@ public static class McpServer
         };
     }
 
-    private static JsonNode Str(string desc)
+    private static JsonObject Str(string desc)
         => new JsonObject { ["type"] = "string", ["description"] = desc };
 
-    private static JsonNode Int(string desc)
+    private static JsonObject Int(string desc)
         => new JsonObject { ["type"] = "integer", ["description"] = desc };
 
-    private static JsonNode Num(string desc)
+    private static JsonObject Num(string desc)
         => new JsonObject { ["type"] = "number", ["description"] = desc };
 
     // ── JSON-RPC helpers ──────────────────────────────────────────────────────

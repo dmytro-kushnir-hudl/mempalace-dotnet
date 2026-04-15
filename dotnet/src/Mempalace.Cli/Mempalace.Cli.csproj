@@ -9,8 +9,6 @@
         <Version>0.1.0</Version>
         <EnableNETAnalyzers>true</EnableNETAnalyzers>
         <AnalysisLevel>latest-recommended</AnalysisLevel>
-        <PublishAot>true</PublishAot>
-        <TrimmerRootDescriptor>$(MSBuildThisFileDirectory)TrimmerRoots.xml</TrimmerRootDescriptor>
     </PropertyGroup>
 
     <ItemGroup>
