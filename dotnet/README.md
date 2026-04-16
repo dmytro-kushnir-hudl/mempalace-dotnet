@@ -185,6 +185,10 @@ dotnet run -c Release --project benchmarks/Mempalace.Benchmarks/
 
 Compares Sqlite vs Chroma for `Upsert`, `Search`, `GetFiltered`, and `Count` at 50 and 200 drawer counts. Uses `[ShortRunJob]` (1 warmup, 3 iterations). See `docs/benchmark-results-2026-04-11.md` for full results.
 
+## TODO
+
+- [ ] **Palace-level model tag** — store embedding model name (e.g. `bge-small-en-v1.5`) in a `palace_meta` SQLite table on first mine; check on every `PalaceSession.Open` and fail loudly if the model doesn't match. Prevents silent garbage results when switching models without re-mining.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

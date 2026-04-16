@@ -17,7 +17,9 @@ namespace Mempalace;
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 internal partial class MempalaceJsonContext : JsonSerializerContext { }
 
-/// <summary>Source-gen context for config deserialization — case-insensitive.</summary>
+/// <summary>Source-gen context for config deserialization — snake_case keys, case-insensitive.</summary>
 [JsonSerializable(typeof(MempalaceConfig))]
-[JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true)]
+[JsonSourceGenerationOptions(
+    PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower,
+    PropertyNameCaseInsensitive = true)]
 internal partial class MempalaceConfigContext : JsonSerializerContext { }

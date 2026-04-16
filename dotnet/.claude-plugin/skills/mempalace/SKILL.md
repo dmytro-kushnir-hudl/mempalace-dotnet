@@ -6,41 +6,88 @@ allowed-tools: Bash, Read, Write, Edit, Glob, Grep
 
 # MemPalace .NET
 
-A searchable memory palace for AI — mine projects and conversations, then search them semantically.
-Supports two vector backends: ChromaDB (default) and SQLite (via sqlite-vec).
+Semantic memory palace — mine projects/convos, search them, expose via 22 MCP tools.
+Default model: **BGE-small-en-v1.5** (512 tokens, INT8, ~93 chunks/s on Apple Silicon P-cores).
 
-## Prerequisites
-
-Ensure the .NET port is built:
-
-```bash
-dotnet build /path/to/mempalace/dotnet/src/Mempalace.Cli
-```
-
-Or use the pre-built binary:
+## Quick check
 
 ```bash
 mempalace-dotnet --version
+mempalace-dotnet status
 ```
 
-## Usage
-
-MemPalace provides dynamic instructions via the CLI:
+## Mine
 
 ```bash
-mempalace-dotnet instructions <command>
+# Source code / docs (skips csv, json, srt, docx, pdf by default)
+mempalace-dotnet mine <dir>
+
+# Force all file types (csv, json, srt, docx, pdf, etc.)
+mempalace-dotnet mine <dir> --overdrive
+
+# Claude Code / ChatGPT / Slack conversation exports
+mempalace-dotnet mine <dir> --mode convos
+
+# Specific wing, dry-run preview, limit files
+mempalace-dotnet mine <dir> --wing myproject --dry-run --limit 10
+
+# Custom palace path
+mempalace-dotnet mine <dir> --palace ~/.mempalace/work-palace
+
+# Switch model (MiniLM = 256 tok, BgeSmall = 512 tok — default)
+mempalace-dotnet mine <dir> --model MiniLM
 ```
 
-Where `<command>` is one of: `help`, `init`, `mine`, `search`, `status`.
-
-Run the appropriate instructions command, then follow the returned instructions step by step.
-
-## Backend selection
-
-Pass `--backend Sqlite` to any command to use the SQLite backend instead of ChromaDB:
+## Search
 
 ```bash
-mempalace-dotnet mine <dir> --backend Sqlite
-mempalace-dotnet search "query" --backend Sqlite
-mempalace-dotnet mcp --backend Sqlite
+mempalace-dotnet search "query"
+mempalace-dotnet search "query" --wing myproject --room technical --n 10
+```
+
+## Status
+
+```bash
+mempalace-dotnet status
+mempalace-dotnet status --palace ~/.mempalace/work-palace
+```
+
+## MCP server
+
+```bash
+mempalace-dotnet mcp
+mempalace-dotnet mcp --palace ~/.mempalace/palace
+```
+
+## Options (global)
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--palace` | `~/.mempalace/palace` | Palace directory |
+| `--model` | `BgeSmall` | `MiniLM` (256 tok) or `BgeSmall` (512 tok) |
+| `--int8` | `true` | INT8 quantized model (~3-4x faster) |
+| `--backend` | `Sqlite` | `Sqlite` or `Chroma` |
+
+## Mine flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--mode` | `files` | `files` or `convos` |
+| `--overdrive` | `false` | Mine all file types (bypasses csv/json/srt/docx skip list) |
+| `--wing` | auto | Override wing name |
+| `--dry-run` | `false` | Preview without writing |
+| `--limit` | `0` (all) | Max files |
+| `--parallel` | `false` | Producer-consumer pipeline |
+
+## Skipped by default (use --overdrive to include)
+
+`.csv`, `.tsv`, `.json`, `.jsonl`, `.srt`, `.vtt`, `.docx`, `.doc`, `.xls`, `.xlsx`, `.pptx`, `.pdf`, `.epub`, `.lock`, `.sum`
+
+> Note: `--mode convos` always includes `.json`/`.jsonl` — it has its own extension list.
+
+## Init (auto-detect rooms)
+
+```bash
+mempalace-dotnet init <dir>
+mempalace-dotnet init <dir> --wing myproject
 ```

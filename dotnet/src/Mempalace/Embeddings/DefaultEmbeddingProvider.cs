@@ -35,47 +35,48 @@ internal static class OnnxNativeResolver
         }
         catch (InvalidOperationException)
         {
-            // Resolver already registered by another component (ORT's own AOT initializer)
+            // Resolver already registered by another component
         }
     }
 }
 
-/// <summary>Requested / active ONNX execution provider.</summary>
-public enum ExecutionProvider { Auto, Cpu, CoreML }
+public enum EmbeddingModel
+{
+    /// <summary>all-MiniLM-L6-v2 — 256 tokens, 384 dims. ChromaDB default.</summary>
+    MiniLM,
+    /// <summary>bge-small-en-v1.5 — 512 tokens, 384 dims. Better recall on longer chunks.</summary>
+    BgeSmall,
+}
 
 /// <summary>
-///     ONNX-based embedding provider that exactly matches the Python ChromaDB default:
-///     <c>all-MiniLM-L6-v2</c> with mean pooling and L2 normalisation (384 dims).
-///     <para>
-///         On first use the model is downloaded from the same S3 URL ChromaDB uses
-///         and cached to <c>~/.cache/chroma/onnx_models/all-MiniLM-L6-v2/onnx/</c>.
-///         SHA-256 is verified before extraction.
-///     </para>
-///     <para>Use <see cref="CreateAsync"/> to construct; implements <see cref="IDisposable"/>.</para>
+///     ONNX CPU embedding provider supporting MiniLM-L6-v2 and BGE-small-en-v1.5.
+///     Mean pooling + L2 normalisation, INT8 quantized by default.
+///     <para>Use <see cref="CreateAsync"/> to construct.</para>
 /// </summary>
-/// <inheritdoc cref="IEmbeddingGenerator{TInput,TEmbedding}"/>
 public sealed class DefaultEmbeddingProvider
     : IEmbeddingGenerator<ReadOnlyMemory<char>, Embedding<float>>, IDisposable, IAsyncDisposable
 {
-    // Same constants as Python ONNXMiniLM_L6_V2
-    public const string ModelName = "all-MiniLM-L6-v2";
-    public const string ArchiveUrl = "https://chroma-onnx-models.s3.amazonaws.com/all-MiniLM-L6-v2/onnx.tar.gz";
-    public const string ArchiveSha256 = "913d7300ceae3b2dbc2c50d1de4baacab4be7b9380491c27fab7418616a16ec3";
-    public const int MaxTokens = 256;
     public const int EmbeddingDim = 384;
 
-    // INT8 quantized model — ARM64-optimized, uses UDOT instructions on Apple Silicon
-    public const string Int8ModelUrl = "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/onnx/model_qint8_arm64.onnx";
-
-    private static readonly string ModelCacheDir = Path.Combine(
+    // ── MiniLM-L6-v2 ────────────────────────────────────────────────────────
+    private static readonly string MiniLmDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".cache", "chroma", "onnx_models", ModelName, "onnx");
-
-    private static readonly string Int8CacheDir = Path.Combine(
+        ".cache", "chroma", "onnx_models", "all-MiniLM-L6-v2", "onnx");
+    private static readonly string MiniLmInt8Dir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".cache", "chroma", "onnx_models", ModelName + "-int8", "onnx");
+        ".cache", "chroma", "onnx_models", "all-MiniLM-L6-v2-int8", "onnx");
+    private const string MiniLmArchiveUrl  = "https://chroma-onnx-models.s3.amazonaws.com/all-MiniLM-L6-v2/onnx.tar.gz";
+    private const string MiniLmArchiveSha  = "913d7300ceae3b2dbc2c50d1de4baacab4be7b9380491c27fab7418616a16ec3";
+    private const string MiniLmInt8Url     = "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/onnx/model_qint8_arm64.onnx";
 
-    private static readonly HttpClient Http = new();
+    // ── BGE-small-en-v1.5 ────────────────────────────────────────────────────
+    private static readonly string BgeSmallDir = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".cache", "rag-pg", "bge-small-en-v1.5");
+    private const string BgeSmallBaseUrl   = "https://huggingface.co/BAAI/bge-small-en-v1.5/resolve/main";
+    private const string BgeSmallInt8Url   = "https://huggingface.co/keisuke-miyako/bge-small-en-v1.5-onnx-int8/resolve/b51639d8a18149c302c5f6e9701cf14db8dfc296/model_quantized.onnx";
+
+    private static readonly HttpClient Http = new() { DefaultRequestHeaders = { { "User-Agent", "mempalace/1.0" } } };
 
     // Static RunOptions and input names — avoids per-call allocation
     private static readonly RunOptions s_runOptions = new();
@@ -83,72 +84,67 @@ public sealed class DefaultEmbeddingProvider
 
     private readonly InferenceSession _session;
     private readonly BertTokenizer _tokenizer;
-    private readonly ExecutionProvider _activeProvider;
+    private readonly int _maxTokens;
     private bool _disposed;
 
     public static int Dimensions => EmbeddingDim;
-    public ExecutionProvider ActiveProvider => _activeProvider;
+    public BertTokenizer Tokenizer => _tokenizer;
+    public int MaxTokens => _maxTokens;
 
-    private DefaultEmbeddingProvider(InferenceSession session, BertTokenizer tokenizer, ExecutionProvider activeProvider)
+    private DefaultEmbeddingProvider(InferenceSession session, BertTokenizer tokenizer, int maxTokens)
     {
-        _session = session;
+        _session   = session;
         _tokenizer = tokenizer;
-        _activeProvider = activeProvider;
+        _maxTokens = maxTokens;
     }
 
-    /// <summary>
-    ///     Creates and initialises the provider, downloading the ONNX model if needed.
-    /// </summary>
-    /// <param name="useInt8">Use INT8 quantized model (~23 MB, ~3–4× faster inference).</param>
-    /// <param name="provider">
-    ///     <see cref="ExecutionProvider.Auto"/> (default) tries CoreML on macOS, falls back to CPU.
-    ///     <see cref="ExecutionProvider.CoreML"/> routes to Apple ANE/GPU on macOS Apple Silicon.
-    ///     <see cref="ExecutionProvider.Cpu"/> uses ONNX CPU provider with all graph optimizations.
-    /// </param>
+    /// <summary>Creates and initialises the provider, downloading the model if needed.</summary>
+    /// <param name="model">Which model to load. Default: <see cref="EmbeddingModel.MiniLM"/>.</param>
+    /// <param name="useInt8">INT8 quantized — ~3–4× faster via UDOT NEON, much smaller. Default: <c>true</c>.</param>
     public static async Task<DefaultEmbeddingProvider> CreateAsync(
-        bool useInt8 = false,
-        ExecutionProvider provider = ExecutionProvider.Auto,
+        EmbeddingModel model = EmbeddingModel.MiniLM,
+        bool useInt8 = true,
         CancellationToken ct = default)
     {
         Console.WriteLine("[embedder] ensuring model cache...");
-        await EnsureModelAsync(ct).ConfigureAwait(false);
 
         string vocabPath, modelPath;
-        if (useInt8)
+        int maxTokens;
+        bool lowerCase;
+
+        switch (model)
         {
-            vocabPath = Path.Combine(ModelCacheDir, "vocab.txt"); // reuse float32 vocab
-            modelPath = Path.Combine(Int8CacheDir, "model_qint8_arm64.onnx");
-            await EnsureInt8ModelAsync(modelPath, ct).ConfigureAwait(false);
-        }
-        else
-        {
-            vocabPath = Path.Combine(ModelCacheDir, "vocab.txt");
-            modelPath = Path.Combine(ModelCacheDir, "model.onnx");
+            case EmbeddingModel.BgeSmall:
+                maxTokens = 512;
+                lowerCase = false; // BGE is cased
+                (vocabPath, modelPath) = await EnsureBgeSmallAsync(useInt8, ct).ConfigureAwait(false);
+                break;
+
+            default: // MiniLM
+                maxTokens = 256;
+                lowerCase = true;
+                (vocabPath, modelPath) = await EnsureMiniLmAsync(useInt8, ct).ConfigureAwait(false);
+                break;
         }
 
         Console.WriteLine("[embedder] loading tokenizer...");
-        var tokenizer = await BertTokenizer.CreateAsync(vocabPath, new BertOptions { LowerCaseBeforeTokenization = true }, ct);
+        var tokenizer = await BertTokenizer.CreateAsync(
+            vocabPath, new BertOptions { LowerCaseBeforeTokenization = lowerCase }, ct);
 
-        var label = useInt8 ? "~23 MB INT8 quantized" : "~90 MB float32";
-        Console.WriteLine($"[embedder] loading ONNX session ({label})...");
+        var label = useInt8 ? "INT8 quantized" : "float32";
+        Console.WriteLine($"[embedder] loading ONNX session ({model} {label}, {maxTokens} tok)...");
         OnnxNativeResolver.EnsureRegistered();
 
-        var (session, activeProvider) = CreateSession(modelPath, provider);
-        Console.WriteLine($"[embedder] ready ({activeProvider}).");
+        var session = new InferenceSession(modelPath, CreateCpuSessionOptions());
+        Console.WriteLine("[embedder] ready.");
 
-        return new DefaultEmbeddingProvider(session, tokenizer, activeProvider);
+        return new DefaultEmbeddingProvider(session, tokenizer, maxTokens);
     }
 
     // -------------------------------------------------------------------------
     // IEmbeddingGenerator<string, Embedding<float>>
     // -------------------------------------------------------------------------
 
-    /// <summary>
-    ///     Generates embeddings for <paramref name="values"/>.
-    ///     Each <see cref="Embedding{T}.Vector"/> is a <see cref="ReadOnlyMemory{T}"/>
-    ///     backed by a managed <c>float[]</c> — compatible with
-    ///     <c>Microsoft.Extensions.VectorData</c> vector properties.
-    /// </summary>
     public Task<GeneratedEmbeddings<Embedding<float>>> GenerateAsync(
         IEnumerable<ReadOnlyMemory<char>> values,
         EmbeddingGenerationOptions? options = null,
@@ -165,28 +161,22 @@ public sealed class DefaultEmbeddingProvider
             var batch = new ReadOnlyMemory<char>[end - i];
             for (int j = 0; j < batch.Length; j++) batch[j] = texts[i + j];
 
-            // ANE: one ONNX call per item with fixed [1, MaxTokens] shape.
-            // CPU: full batch with dynamic seq len to avoid wasted compute on short chunks.
-            var batchFloats = _activeProvider == ExecutionProvider.CoreML
-                ? EmbedBatchCoreML(batch)
-                : EmbedBatchCpu(batch);
-
-            foreach (var vec in batchFloats)
+            foreach (var vec in EmbedBatch(batch))
                 embeddings.Add(new Embedding<float>(vec));
         }
 
         return Task.FromResult(new GeneratedEmbeddings<Embedding<float>>(embeddings));
     }
 
-    // IEmbeddingGenerator (non-generic base) service locator
     object? IEmbeddingGenerator.GetService(Type serviceType, object? key)
         => serviceType.IsInstanceOfType(this) ? this : null;
 
     // -------------------------------------------------------------------------
-    // CPU path — full batch, dynamic seq len to skip padding on short chunks
+    // Full batch, dynamic seq len — trims padding to actual max in batch,
+    // avoiding wasted compute on short chunks.
     // -------------------------------------------------------------------------
 
-    private float[][] EmbedBatchCpu(ReadOnlyMemory<char>[] texts)
+    private float[][] EmbedBatch(ReadOnlyMemory<char>[] texts)
     {
         var batchCount = texts.Length;
 
@@ -241,62 +231,11 @@ public sealed class DefaultEmbeddingProvider
         }
         finally
         {
-            // Return AFTER the pooling loop above has finished reading attnMask
+            // Return AFTER the pooling loop has finished reading attnMask
             ArrayPool<long>.Shared.Return(inputIds);
             ArrayPool<long>.Shared.Return(attnMask);
             ArrayPool<long>.Shared.Return(typeIds);
         }
-    }
-
-    // -------------------------------------------------------------------------
-    // CoreML path — static shape [1, MaxTokens] per item, delegates to ANE/GPU
-    // -------------------------------------------------------------------------
-
-    private float[][] EmbedBatchCoreML(ReadOnlyMemory<char>[] texts)
-    {
-        var batchCount = texts.Length;
-        var result = new float[batchCount][];
-
-        var inputIds = ArrayPool<long>.Shared.Rent(MaxTokens);
-        var attnMask = ArrayPool<long>.Shared.Rent(MaxTokens);
-        var typeIds  = ArrayPool<long>.Shared.Rent(MaxTokens);
-        typeIds.AsSpan(0, MaxTokens).Clear(); // token_type_ids is always 0
-
-        try
-        {
-            var shape = new long[] { 1L, MaxTokens };
-            var info = OrtMemoryInfo.DefaultInstance;
-
-            for (var b = 0; b < batchCount; b++)
-            {
-                var ids = TokenizeText(texts[b].Span);
-
-                inputIds.AsSpan(0, MaxTokens).Clear();
-                attnMask.AsSpan(0, MaxTokens).Clear();
-                var len = Math.Min(ids.Count, MaxTokens);
-                for (var t = 0; t < len; t++)
-                {
-                    inputIds[t] = ids[t];
-                    attnMask[t] = 1L;
-                }
-
-                using var inputIdsVal = OrtValue.CreateTensorValueFromMemory(info, inputIds.AsMemory(0, MaxTokens), shape);
-                using var attnMaskVal = OrtValue.CreateTensorValueFromMemory(info, attnMask.AsMemory(0, MaxTokens), shape);
-                using var typeIdsVal  = OrtValue.CreateTensorValueFromMemory(info, typeIds.AsMemory(0, MaxTokens), shape);
-                OrtValue[] inputValues = [inputIdsVal, attnMaskVal, typeIdsVal];
-
-                using var outputs = _session.Run(s_runOptions, s_inputNames, inputValues, _session.OutputNames);
-                result[b] = PoolEmbedding(outputs[0].GetTensorDataAsSpan<float>(), attnMask, 0, MaxTokens);
-            }
-        }
-        finally
-        {
-            ArrayPool<long>.Shared.Return(inputIds);
-            ArrayPool<long>.Shared.Return(attnMask);
-            ArrayPool<long>.Shared.Return(typeIds);
-        }
-
-        return result;
     }
 
     // -------------------------------------------------------------------------
@@ -305,7 +244,6 @@ public sealed class DefaultEmbeddingProvider
 
     private IReadOnlyList<int> TokenizeText(ReadOnlySpan<char> chars)
     {
-        // Strip surrogates and reserved Unicode code points
         bool dirty = false;
         foreach (var c in chars)
             if (char.IsSurrogate(c) || c == '\uFFFE' || c == '\uFFFF') { dirty = true; break; }
@@ -334,7 +272,7 @@ public sealed class DefaultEmbeddingProvider
         }
 
         var tokenInput = normalized is not null ? normalized.AsSpan() : input;
-        var ids = _tokenizer.EncodeToIds(tokenInput, MaxTokens, normalizedText: out _, charsConsumed: out _);
+        var ids = _tokenizer.EncodeToIds(tokenInput, _maxTokens, normalizedText: out _, charsConsumed: out _);
 
         if (rentedClean is not null) ArrayPool<char>.Shared.Return(rentedClean);
         return ids;
@@ -360,7 +298,6 @@ public sealed class DefaultEmbeddingProvider
                 emb);
         }
 
-        // Mean pool then L2 normalise
         maskSum = MathF.Max(maskSum, 1e-9f);
         TensorPrimitives.Divide((ReadOnlySpan<float>)emb, maskSum, emb);
 
@@ -372,74 +309,24 @@ public sealed class DefaultEmbeddingProvider
     }
 
     // -------------------------------------------------------------------------
-    // Session factory — mirrors rag-pg OnnxEmbedder.CreateSession
+    // Session options — CPU, P-cores only, BERT-optimized
     // -------------------------------------------------------------------------
 
-    private static (InferenceSession Session, ExecutionProvider ActiveProvider) CreateSession(
-        string modelPath, ExecutionProvider provider)
-    {
-        switch (provider)
-        {
-            case ExecutionProvider.Cpu:
-                return (new InferenceSession(modelPath, CreateCpuSessionOptions()), ExecutionProvider.Cpu);
-
-            case ExecutionProvider.CoreML:
-                return (new InferenceSession(modelPath, CreateCoreMlSessionOptions()),
-                    ExecutionProvider.CoreML);
-
-            case ExecutionProvider.Auto:
-                if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                    return (new InferenceSession(modelPath, CreateCpuSessionOptions()), ExecutionProvider.Cpu);
-                try
-                {
-                    return (new InferenceSession(modelPath, CreateCoreMlSessionOptions()),
-                        ExecutionProvider.CoreML);
-                }
-                catch (Exception ex) when (ex is OnnxRuntimeException or NotSupportedException)
-                {
-                    Console.WriteLine($"[embedder] CoreML unavailable, falling back to CPU: {ex.Message}");
-                    return (new InferenceSession(modelPath, CreateCpuSessionOptions()), ExecutionProvider.Cpu);
-                }
-
-            default:
-                throw new ArgumentOutOfRangeException(nameof(provider));
-        }
-    }
-
-    private static SessionOptions CreateBaseSessionOptions()
+    private static SessionOptions CreateCpuSessionOptions()
     {
         var opts = new SessionOptions();
         opts.LogSeverityLevel = OrtLoggingLevel.ORT_LOGGING_LEVEL_ERROR;
-        // Level 3: includes layout optimizations and op fusion (critical for BERT)
+        // Level 3: layout optimizations + op fusion (critical for BERT)
         opts.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
-        // BERT layers are linearly dependent — sequential execution is optimal
+        // BERT layers are linearly dependent — sequential is optimal
         opts.ExecutionMode = ExecutionMode.ORT_SEQUENTIAL;
         // Pre-allocate contiguous memory blocks for activations
         opts.EnableMemoryPattern = true;
         opts.EnableCpuMemArena = true;
-        return opts;
-    }
-
-    private static SessionOptions CreateCpuSessionOptions()
-    {
-        var opts = CreateBaseSessionOptions();
-        opts.IntraOpNumThreads = Environment.ProcessorCount;
-        // Thread spinning keeps threads awake between ops, reducing latency
+        // Cap at 10 to stay on P-cores only (Apple Silicon / modern Intel)
+        opts.IntraOpNumThreads = Math.Min(Environment.ProcessorCount, 10);
+        // Thread spinning keeps P-cores awake between ops, minimising context-switch latency
         opts.AddSessionConfigEntry("session.intra_op.thread_affinities", "1");
-        return opts;
-    }
-
-    private static SessionOptions CreateCoreMlSessionOptions()
-    {
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            throw new NotSupportedException("CoreML requires macOS.");
-        var opts = CreateBaseSessionOptions();
-        // Keep CPU thread pool minimal — ANE/GPU handles computation
-        opts.IntraOpNumThreads = 1;
-        // MLPROGRAM is the modern CoreML backend required to dispatch to Apple Neural Engine
-        opts.AppendExecutionProvider_CoreML(
-            CoreMLFlags.COREML_FLAG_ONLY_ALLOW_STATIC_INPUT_SHAPES |
-            CoreMLFlags.COREML_FLAG_CREATE_MLPROGRAM);
         return opts;
     }
 
@@ -447,71 +334,92 @@ public sealed class DefaultEmbeddingProvider
     // Model bootstrap
     // -------------------------------------------------------------------------
 
-    private static async Task EnsureModelAsync(CancellationToken ct)
+    private static async Task<(string VocabPath, string ModelPath)> EnsureMiniLmAsync(
+        bool useInt8, CancellationToken ct)
     {
-        var modelPath     = Path.Combine(ModelCacheDir, "model.onnx");
-        var tokenizerPath = Path.Combine(ModelCacheDir, "tokenizer.json");
+        var vocabPath = Path.Combine(MiniLmDir, "vocab.txt");
+        var modelPath = Path.Combine(MiniLmDir, "model.onnx");
 
-        if (File.Exists(modelPath) && File.Exists(tokenizerPath))
-            return;
-
-        var parentDir    = Path.GetDirectoryName(ModelCacheDir)!;
-        var archivePath  = Path.Combine(parentDir, "onnx.tar.gz");
-
-        Directory.CreateDirectory(parentDir);
-
-        if (!File.Exists(archivePath) || !VerifySha256(archivePath, ArchiveSha256))
+        if (!File.Exists(modelPath))
         {
-            Console.WriteLine($"[embedder] downloading model from {ArchiveUrl} ...");
-            await DownloadFileAsync(ArchiveUrl, archivePath, ct).ConfigureAwait(false);
-            Console.WriteLine("[embedder] download complete, verifying SHA-256...");
+            var parentDir   = Path.GetDirectoryName(MiniLmDir)!;
+            var archivePath = Path.Combine(parentDir, "onnx.tar.gz");
+            Directory.CreateDirectory(parentDir);
 
-            if (!VerifySha256(archivePath, ArchiveSha256))
+            if (!File.Exists(archivePath) || !VerifySha256(archivePath, MiniLmArchiveSha))
             {
-                File.Delete(archivePath);
-                throw new InvalidOperationException(
-                    "Downloaded ONNX model archive SHA-256 mismatch — possible corruption or tampering.");
+                Console.WriteLine($"[embedder] downloading MiniLM (~90 MB)...");
+                await DownloadAsync(MiniLmArchiveUrl, archivePath, ct).ConfigureAwait(false);
+                if (!VerifySha256(archivePath, MiniLmArchiveSha))
+                {
+                    File.Delete(archivePath);
+                    throw new InvalidOperationException("MiniLM archive SHA-256 mismatch.");
+                }
             }
+            using var fs = File.OpenRead(archivePath);
+            using var gz = new GZipStream(fs, CompressionMode.Decompress);
+            TarFile.ExtractToDirectory(gz, parentDir, overwriteFiles: true);
         }
 
-        Console.WriteLine("[embedder] extracting archive...");
-        ExtractTarGz(archivePath, parentDir);
-        Console.WriteLine("[embedder] model extracted.");
+        if (!useInt8) return (vocabPath, modelPath);
+
+        var int8Path = Path.Combine(MiniLmInt8Dir, "model_qint8_arm64.onnx");
+        if (!File.Exists(int8Path))
+        {
+            Directory.CreateDirectory(MiniLmInt8Dir);
+            Console.WriteLine("[embedder] downloading MiniLM INT8 (~23 MB)...");
+            await DownloadAsync(MiniLmInt8Url, int8Path, ct).ConfigureAwait(false);
+        }
+        return (vocabPath, int8Path);
     }
 
-    private static async Task EnsureInt8ModelAsync(string modelPath, CancellationToken ct)
+    private static async Task<(string VocabPath, string ModelPath)> EnsureBgeSmallAsync(
+        bool useInt8, CancellationToken ct)
     {
-        if (File.Exists(modelPath)) return;
-        Directory.CreateDirectory(Path.GetDirectoryName(modelPath)!);
-        Console.WriteLine("[embedder] downloading INT8 model from HuggingFace (~23 MB)...");
-        await DownloadFileAsync(Int8ModelUrl, modelPath, ct).ConfigureAwait(false);
-        Console.WriteLine("[embedder] INT8 model downloaded.");
+        Directory.CreateDirectory(BgeSmallDir);
+
+        var vocabPath = Path.Combine(BgeSmallDir, "vocab.txt");
+        if (!File.Exists(vocabPath))
+        {
+            Console.WriteLine("[embedder] downloading BGE-small vocab...");
+            await DownloadAsync($"{BgeSmallBaseUrl}/vocab.txt", vocabPath, ct).ConfigureAwait(false);
+        }
+
+        if (useInt8)
+        {
+            var int8Path = Path.Combine(BgeSmallDir, "model.int8.onnx");
+            if (!File.Exists(int8Path))
+            {
+                Console.WriteLine("[embedder] downloading BGE-small INT8 (~23 MB)...");
+                await DownloadAsync(BgeSmallInt8Url, int8Path, ct).ConfigureAwait(false);
+            }
+            return (vocabPath, int8Path);
+        }
+
+        var modelPath = Path.Combine(BgeSmallDir, "model.onnx");
+        if (!File.Exists(modelPath))
+        {
+            Console.WriteLine("[embedder] downloading BGE-small float32 (~133 MB)...");
+            await DownloadAsync($"{BgeSmallBaseUrl}/onnx/model.onnx", modelPath, ct).ConfigureAwait(false);
+        }
+        return (vocabPath, modelPath);
     }
 
-    private static async Task DownloadFileAsync(string url, string dest, CancellationToken ct)
+    private static async Task DownloadAsync(string url, string dest, CancellationToken ct)
     {
         using var response = await Http
             .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct)
             .ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
-
         await using var fs = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.None,
             bufferSize: 81920, useAsync: true);
         await response.Content.CopyToAsync(fs, ct).ConfigureAwait(false);
     }
 
-    private static void ExtractTarGz(string archivePath, string destDir)
-    {
-        using var fs = File.OpenRead(archivePath);
-        using var gz = new GZipStream(fs, CompressionMode.Decompress);
-        TarFile.ExtractToDirectory(gz, destDir, overwriteFiles: true);
-    }
-
     private static bool VerifySha256(string path, string expectedHex)
     {
-        using var sha = SHA256.Create();
         using var stream = File.OpenRead(path);
-        var hash = sha.ComputeHash(stream);
+        var hash = SHA256.HashData(stream);
         return Convert.ToHexString(hash).Equals(expectedHex, StringComparison.OrdinalIgnoreCase);
     }
 

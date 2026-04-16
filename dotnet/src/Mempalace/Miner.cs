@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -23,7 +24,8 @@ public sealed record MinerOptions(
     bool RespectGitignore = true,
     IReadOnlyList<string>? IncludeIgnored = null,
     VectorBackend Backend = VectorBackend.Sqlite,
-    bool Parallel = false);
+    bool Parallel = false,
+    bool Overdrive = false);  // bypass SkipExtensions — mine csv/json/srt/etc
 
 // ---------------------------------------------------------------------------
 // Miner
@@ -380,6 +382,11 @@ public static class Miner
         var batch = new List<PendingChunk>(BatchSize);
         var progress = new MineProgress(projectDir);
 
+        // Use token-aware streaming chunker when the embedder exposes a tokenizer
+        var tokenChunker = (embedder as Mempalace.Embeddings.DefaultEmbeddingProvider) is { } dep
+            ? new TokenAwareChunker(dep.Tokenizer, dep.MaxTokens)
+            : null;
+
         foreach (var file in files)
         {
             ct.ThrowIfCancellationRequested();
@@ -396,30 +403,40 @@ public static class Miner
                 }
             }
 
-            string content;
             double fileMtime;
             try
             {
                 var info = new FileInfo(file);
                 if (info.Length > Constants.MaxFileSize) continue;
                 fileMtime = (info.LastWriteTimeUtc - DateTime.UnixEpoch).TotalSeconds;
-                content = await File.ReadAllTextAsync(file, ct);
             }
-            catch
+            catch { continue; }
+
+            IAsyncEnumerable<Chunk> chunks;
+            string room;
+
+            if (tokenChunker != null)
             {
-                continue;
+                // Token-aware: read sample for room detection, stream chunks
+                var sample = await ReadSampleAsync(file, 4096, ct).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(sample)) continue;
+                room = DetectRoom(file, sample, rooms, projectDir);
+                chunks = tokenChunker.ChunkFileAsync(file, ct);
             }
-
-            if (string.IsNullOrWhiteSpace(content)) continue;
-
-            var room = DetectRoom(file, content, rooms, projectDir);
-            var chunks = ChunkText(content);
+            else
+            {
+                string content;
+                try { content = await File.ReadAllTextAsync(file, ct).ConfigureAwait(false); }
+                catch { continue; }
+                if (string.IsNullOrWhiteSpace(content)) continue;
+                room = DetectRoom(file, content, rooms, projectDir);
+                chunks = ChunkText(content).ToAsyncEnumerable(ct);
+            }
 
             progress.File(file, false);
 
-            foreach (var chunk in chunks)
+            await foreach (var chunk in chunks.WithCancellation(ct))
             {
-                ct.ThrowIfCancellationRequested();
                 if (options.DryRun)
                 {
                     Console.WriteLine($"[dry-run] {wing}/{room} chunk {chunk.ChunkIndex}: {file}");
@@ -452,6 +469,34 @@ public static class Miner
     }
 
     // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private static async Task<string> ReadSampleAsync(string path, int maxChars, CancellationToken ct)
+    {
+        try
+        {
+            await using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
+            using var reader = new StreamReader(fs, Encoding.UTF8);
+            var buf = new char[maxChars];
+            var read = await reader.ReadAsync(buf.AsMemory(), ct).ConfigureAwait(false);
+            return new string(buf, 0, read);
+        }
+        catch { return string.Empty; }
+    }
+
+    private static async IAsyncEnumerable<Chunk> ToAsyncEnumerable(
+        this IEnumerable<Chunk> source,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        foreach (var item in source)
+        {
+            ct.ThrowIfCancellationRequested();
+            yield return item;
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // File enumeration with gitignore support
     // -------------------------------------------------------------------------
 
@@ -461,12 +506,12 @@ public static class Miner
             ? new HashSet<string>(options.IncludeIgnored.Select(Path.GetFullPath))
             : null;
 
-        return EnumerateDir(root, root, options.RespectGitignore, includeSet);
+        return EnumerateDir(root, root, options.RespectGitignore, includeSet, options.Overdrive);
     }
 
     private static IEnumerable<string> EnumerateDir(
         string dir, string root, bool useGitignore,
-        HashSet<string>? forceInclude)
+        HashSet<string>? forceInclude, bool overdrive = false)
     {
         var gitignore = useGitignore ? GitignoreMatcher.TryLoad(dir) : null;
 
@@ -493,13 +538,16 @@ public static class Miner
 
             if (isDir)
             {
-                foreach (var f in EnumerateDir(entry, root, useGitignore, forceInclude))
+                foreach (var f in EnumerateDir(entry, root, useGitignore, forceInclude, overdrive))
                     yield return f;
             }
             else
             {
                 var ext = Path.GetExtension(entry);
-                if (!Constants.ReadableExtensions.Contains(ext)) continue;
+                var inReadable = Constants.ReadableExtensions.Contains(ext);
+                var inSkip     = Constants.SkipExtensions.Contains(ext);
+                if (!inReadable && !inSkip) continue;  // always exclude unknown/binary (png, mp4, …)
+                if (!overdrive && inSkip) continue;    // data formats only allowed with --overdrive
                 if (Constants.SkipFilenames.Contains(name)) continue;
                 yield return entry;
             }

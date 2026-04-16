@@ -6,8 +6,8 @@ using Mempalace;
 // Lazy embedder — created on first use, shared across commands
 // ---------------------------------------------------------------------------
 
-var _useInt8 = false;
-var _provider = ExecutionProvider.Auto;
+var _useInt8 = true;                          // INT8 by default — ~3-4× faster
+var _model   = EmbeddingModel.BgeSmall;        // default model — 512 tok, better recall
 DefaultEmbeddingProvider? _embedder = null;
 
 async Task<DefaultEmbeddingProvider> GetEmbedder()
@@ -15,7 +15,7 @@ async Task<DefaultEmbeddingProvider> GetEmbedder()
     if (_embedder is null)
     {
         Console.Error.WriteLine("Loading embedding model...");
-        _embedder = await DefaultEmbeddingProvider.CreateAsync(useInt8: _useInt8, provider: _provider);
+        _embedder = await DefaultEmbeddingProvider.CreateAsync(model: _model, useInt8: _useInt8);
     }
 
     return _embedder;
@@ -36,17 +36,16 @@ var backendOpt = new Option<VectorBackend>("--backend")
     { Description = "Vector store backend: Chroma | Sqlite", Recursive = true };
 backendOpt.DefaultValueFactory = _ => VectorBackend.Sqlite;
 
-var int8Opt = new Option<bool>("--int8")
-    { Description = "Use INT8 quantized model (~23 MB, ~3-4x faster inference)", Recursive = true };
+var int8Opt = new Option<bool>("--int8") { Description = "INT8 quantized model — ~23 MB, ~3-4x faster (default: true)", Recursive = true };
+int8Opt.DefaultValueFactory = _ => true;
 
-var providerOpt = new Option<ExecutionProvider>("--provider")
-    { Description = "ONNX execution provider: Auto | Cpu | CoreML (default: Auto)", Recursive = true };
-providerOpt.DefaultValueFactory = _ => ExecutionProvider.Auto;
+var modelOpt = new Option<EmbeddingModel>("--model") { Description = "Embedding model: MiniLM (256 tok) | BgeSmall (512 tok) (default: MiniLM)", Recursive = true };
+modelOpt.DefaultValueFactory = _ => EmbeddingModel.BgeSmall;
 
 rootCmd.Add(palaceOpt);
 rootCmd.Add(backendOpt);
 rootCmd.Add(int8Opt);
-rootCmd.Add(providerOpt);
+rootCmd.Add(modelOpt);
 
 // ---------------------------------------------------------------------------
 // mine
@@ -61,6 +60,8 @@ var mineLimitOpt = new Option<int>("--limit") { Description = "Max files (0 = al
 var mineDryOpt = new Option<bool>("--dry-run") { Description = "Preview without writing" };
 var mineParallelOpt = new Option<bool>("--parallel")
     { Description = "Pipeline I/O and embedding for higher throughput" };
+var mineOverdriveOpt = new Option<bool>("--overdrive")
+    { Description = "Mine all file types including csv/json/srt/docx (normally skipped)" };
 
 mineModeOpt.DefaultValueFactory = _ => "files";
 mineWingOpt.DefaultValueFactory = _ => null;
@@ -74,6 +75,7 @@ mineCmd.Add(mineAgentOpt);
 mineCmd.Add(mineLimitOpt);
 mineCmd.Add(mineDryOpt);
 mineCmd.Add(mineParallelOpt);
+mineCmd.Add(mineOverdriveOpt);
 
 mineCmd.SetAction(async (result, ct) =>
 {
@@ -85,6 +87,7 @@ mineCmd.SetAction(async (result, ct) =>
     var limit = result.GetValue(mineLimitOpt);
     var dryRun = result.GetValue(mineDryOpt);
     var parallel = result.GetValue(mineParallelOpt);
+    var overdrive = result.GetValue(mineOverdriveOpt);
     var backend = result.GetValue(backendOpt);
     var embedder = await GetEmbedder();
     if (mode == "convos")
@@ -92,7 +95,7 @@ mineCmd.SetAction(async (result, ct) =>
             new ConvoMinerOptions(wing, agent, limit, dryRun, Backend: backend), ct);
     else
         await Miner.MineAsync(dir.FullName, palace, embedder,
-            new MinerOptions(wing, agent, limit, dryRun, Backend: backend, Parallel: parallel), ct);
+            new MinerOptions(wing, agent, limit, dryRun, Backend: backend, Parallel: parallel, Overdrive: overdrive), ct);
 });
 
 rootCmd.Add(mineCmd);
@@ -376,7 +379,7 @@ rootCmd.Add(instrCmd);
 
 var parseResult = rootCmd.Parse(args);
 _useInt8 = parseResult.GetValue(int8Opt);
-_provider = parseResult.GetValue(providerOpt);
+_model   = parseResult.GetValue(modelOpt);
 var exitCode = await parseResult.InvokeAsync();
 _embedder?.Dispose();
 return exitCode;

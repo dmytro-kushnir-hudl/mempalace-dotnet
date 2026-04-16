@@ -15,7 +15,8 @@ public static class Constants
     public const int ChunkSize = 800;
     public const int ChunkOverlap = 100;
     public const int MinChunkSize = 50;
-    public const int MaxFileSize = 10 * 1024 * 1024; // 10 MB
+    public const int MaxFileSize = 10 * 1024 * 1024;  // 10 MB
+    public const int LargeFileThreshold = 512 * 1024; // 512 KB — use streaming chunker above this
     public const string DefaultCollectionName = "mempalace_drawers";
 
     public static readonly IReadOnlySet<string> SkipDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -32,9 +33,20 @@ public static class Constants
         {
             ".txt", ".md", ".py", ".js", ".ts", ".jsx", ".tsx",
             ".yaml", ".yml", ".html", ".css", ".java", ".go", ".rs", ".rb",
-            ".sh", ".csv", ".sql", ".toml", ".cs", ".fs", ".kt", ".swift",
+            ".sh", ".sql", ".toml", ".cs", ".fs", ".kt", ".swift",
             ".cpp", ".c", ".h", ".hpp", ".csproj", ".fsproj", ".vbproj",
             ".sln", ".slnx", ".props", ".targets"
+        };
+
+    // Extensions skipped in file-mode mining (data / binary / subtitle formats)
+    public static readonly IReadOnlySet<string> SkipExtensions =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".csv", ".tsv", ".srt", ".vtt",           // tabular / subtitle
+            ".json", ".jsonl",                         // use --mode convos for these
+            ".docx", ".doc", ".xls", ".xlsx", ".pptx", // office binary
+            ".pdf", ".epub",                           // binary documents
+            ".lock", ".sum",                           // lock files
         };
 
     public static readonly IReadOnlySet<string> SkipFilenames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
